@@ -1,78 +1,12 @@
 # React Kinesis WebRTC
 
-React hooks for [AWS Kinesis WebRTC JavaScript SDK](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js).
+An experimental library of React hooks for the AWS Kinesis WebRTC JavaScript SDK ([link](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js)).
 
-## API
-
-### useMaster(config)
-
-Establishes a master connection using an existing signaling channel. Manages peer connections and returns media streams for each peer.
-
-#### Parameters
-
-- config - `Object`
-
-```typescript
-{
-  credentials: {
-    accessKeyId: string; // AWS access key ID
-    secretAccessKey: string; // AWS secret access key
-  },
-  channelARN: string; // An active AWS signaling channel ARN
-  region: "" // The AWS region of the channel ARN
-  media: {
-    audio: boolean; // stream audio
-    video: boolean | MediaStreamConstraints; // stream video or video options
-  }
-}
-```
-
-#### Return Value
-
-```typescript
-{
-  error: Error | undefined,
-  localMediaSrc: MediaStream | undefined, // Your local media stream
-  peerMediaSrcMap: Map<string, MediaStream> // A map of remote viewer peer media streams (item key is the user's unique ID)
-}
-```
-
-### useViewer(config)
-
-Establishes a viewer connection to an existing, active signaling channel.
-
-#### Parameters
-
-- config - `Object`
-
-```typescript
-{
-  credentials: {
-    accessKeyId: string; // AWS access key ID
-    secretAccessKey: string; // AWS secret access key
-  },
-  channelARN: string; // An active master AWS signaling channel ARN
-  region: string; // The AWS region of the channel ARN
-  media: { // Media options
-    audio: boolean;
-    video: boolean | MediaTrackConstraints;
-  }
-}
-```
-
-#### Return Value
-
-```typescript
-{
-  error: Error | undefined,
-  localMediaSrc: MediaStream | undefined // Your local media stream
-  peerMediaSrc: MediaStream | undefined // The remote master peer media stream
-}
-```
+This library aims to provide a simple, declarative API for use within React components.
 
 ## Examples
 
-### Media stream from a remote master peer:
+### Handle a media stream from a remote master peer:
 
 ```javascript
 import React, { useEffect, useRef } from "react";
@@ -105,7 +39,7 @@ function Viewer() {
 }
 ```
 
-### Local media stream:
+### Handle your local media stream:
 
 ```javascript
 import React, { useEffect, useRef } from "react";
@@ -139,7 +73,7 @@ function Master() {
 }
 ```
 
-### Media streams from one or more remote viewer peers:
+### Handle media streams from one or more remote viewer peers:
 
 ```javascript
 import React, { useEffect, useRef } from "react";
@@ -156,7 +90,7 @@ function Peer({ mediaSrc }) {
 }
 
 function Master() {
-  const { localMediaSrc, peerMediaSrcMap } = useMaster({
+  const config = {
     credentials: {
       accessKeyId: "YOUR_AWS_ACCESS_KEY_ID",
       secretAccessKey: "YOUR_AWS_SECRET_ACCESS_KEY",
@@ -167,26 +101,107 @@ function Master() {
       audio: true,
       video: true,
     },
-  });
+  };
+  const { localMediaSrc, peers } = useMaster(config);
 
   // Display a Peer component for each remote peer stream
-  return [...peerMediaSrcMap.entries()].map(([id, mediaSrc]) => (
-    <Peer key={id} media={mediaSrc} />
-  ));
+  return peers.map(({ id, mediaSrc }) => <Peer key={id} media={mediaSrc} />);
 }
 ```
 
-### Connection errors:
+### Handle connection errors:
 
 ```javascript
 import React, { useEffect, useRef } from "react";
 import { useMaster } from "react-kinesis-webrtc";
 
 function Master() {
-  const { error } = useMaster(/* ... */);
+  const { error } = useMaster(config);
 
   if (error) {
     return <p>An error occurred: {error.message}</p>;
   }
 }
 ```
+
+## API
+
+### useMaster
+
+Establishes a master connection using an existing signaling channel. Manages peer connections and returns media streams for each peer.
+
+#### Params:
+
+- config - `Object`:
+
+```typescript
+{
+  credentials: {
+    accessKeyId: string; // AWS access key ID
+    secretAccessKey: string; // AWS secret access key
+  },
+  channelARN: string; // An active AWS signaling channel ARN
+  region: "" // The AWS region of the channel ARN
+  media: {
+    audio: boolean; // stream audio
+    video: boolean | MediaStreamConstraints; // stream video or video options
+  }
+}
+```
+
+#### Return Value:
+
+```typescript
+{
+  error: Error | undefined,
+  localMediaSrc: MediaStream | undefined, // Your local media stream
+  peers: Array<Peer> // Remote viewer peer media streams
+}
+```
+
+#### Peer Object:
+
+```typescript
+{
+  id: string;
+  connection: RTCPeerConnection;
+  mediaSrc: MediaStream;
+}
+```
+
+### useViewer
+
+Establishes a viewer connection to an existing, active signaling channel.
+
+#### Params
+
+- config - `Object`:
+
+```typescript
+{
+  credentials: {
+    accessKeyId: string; // AWS access key ID
+    secretAccessKey: string; // AWS secret access key
+  },
+  channelARN: string; // An active master AWS signaling channel ARN
+  region: string; // The AWS region of the channel ARN
+  media: { // Media options
+    audio: boolean;
+    video: boolean | MediaTrackConstraints;
+  }
+}
+```
+
+#### Return Value
+
+```typescript
+{
+  error: Error | undefined,
+  localMediaSrc: MediaStream | undefined // Your local media stream
+  peer: Peer // The remote master peer
+}
+```
+
+## A note about the API terminology
+
+This library uses the "master/viewer" role names in order to maintain consistency with the Kinesis WebRTC platform. While this language can be perceived as problematic and/or offensive, it remains in use for the sake of clarity. Any feedback regarding this issue is welcome.

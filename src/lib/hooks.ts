@@ -16,7 +16,11 @@ import {
   ERROR_PEER_CONNECTION_LOCAL_DESCRIPTION_REQUIRED,
   ERROR_PEER_CONNECTION_NOT_FOUND,
   ERROR_PEER_CONNECTION_NOT_INITIALIZED,
+  ERROR_PEER_ID_MISSING,
   ERROR_SIGNALING_CLIENT_NOT_CONNECTED,
+  PEER_STATUS_ACTIVE,
+  PEER_STATUS_INACTIVE,
+  PEER_STATUS_PENDING_MEDIA,
 } from "./constants";
 
 type AWSCredentials = {
@@ -149,8 +153,9 @@ function useSignalingChannelEndpoints(config: {
  **/
 function useSignalingClient(config: {
   channelARN: string;
-  credentials: AWSCredentials;
   channelEndpoint?: string;
+  clientId?: string;
+  credentials: AWSCredentials;
   region: string;
   role: KVSWebRTC.Role;
   kinesisVideoClient: KinesisVideo;
@@ -158,33 +163,29 @@ function useSignalingClient(config: {
   const {
     channelARN,
     channelEndpoint,
+    clientId,
     credentials: { accessKeyId, secretAccessKey },
     kinesisVideoClient,
     region,
     role,
   } = config;
 
-  const [clientId, setClientId] = useState<string | undefined>();
   const [client, setClient] = useState<KVSWebRTC.SignalingClient>();
   const { systemClockOffset } = kinesisVideoClient.config;
-
-  /** Generate a client id for VIEWER role */
-  useEffect(() => {
-    if (role === KVSWebRTC.Role.VIEWER) {
-      setClientId(uuid());
-    }
-  }, [role]);
 
   /** Create signaling client when endpoints are available. */
   useEffect(() => {
     if (!channelEndpoint) {
       return;
     }
+    if (!clientId && role === KVSWebRTC.Role.VIEWER) {
+      return;
+    }
     setClient(
       new KVSWebRTC.SignalingClient({
         channelARN,
         channelEndpoint,
-        ...(clientId ? { clientId } : null),
+        clientId,
         credentials: { accessKeyId, secretAccessKey },
         region,
         role,
@@ -217,8 +218,16 @@ function useSignalingClient(config: {
 /**
  * @description Reducer for peer connections state.
  **/
-interface PeerConnection {
-  id: string;
+const peerStatus = [
+  PEER_STATUS_ACTIVE,
+  PEER_STATUS_INACTIVE,
+  PEER_STATUS_PENDING_MEDIA,
+] as const;
+
+type PeerStatus = typeof peerStatus[number];
+
+interface Peer {
+  id?: string;
   connection?: RTCPeerConnection;
   media?: MediaStream;
   handlers?: {
@@ -226,11 +235,11 @@ interface PeerConnection {
     iceConnectionStateChange?: (event: Event) => void;
     track?: (event: RTCTrackEvent) => void;
   };
-  status: "ACTIVE" | "INACTIVE";
+  status: PeerStatus;
 }
 
 type PeerState = {
-  entities: Map<string, PeerConnection>;
+  entities: Map<string, Peer>;
 };
 
 function usePeerState() {
@@ -239,39 +248,44 @@ function usePeerState() {
     action: {
       type: string;
       payload?: {
-        id: string;
+        id?: string;
         connection?: RTCPeerConnection;
         media?: MediaStream;
-        handlers?: PeerConnection["handlers"];
+        handlers?: Peer["handlers"];
       };
     }
   ): PeerState {
     const itemId = action.payload?.id;
     const item = itemId ? state.entities.get(itemId) : undefined;
 
-    console.log(action.type);
-
     switch (action.type) {
       case ACTION_ADD_PEER_CONNECTION:
         if (!action.payload?.connection) {
           throw new Error(ERROR_CONNECTION_OBJECT_NOT_PROVIDED);
         }
+        if (!action.payload?.id) {
+          throw new Error(ERROR_PEER_ID_MISSING);
+        }
         state.entities.set(action.payload.id, {
           ...action.payload,
-          status: "ACTIVE",
+          status: PEER_STATUS_PENDING_MEDIA,
         });
         break;
       case ACTION_ADD_PEER_MEDIA:
         if (!item || !itemId) {
           throw new Error(ERROR_PEER_CONNECTION_NOT_FOUND);
         }
-        state.entities.set(itemId, { ...item, media: action.payload?.media });
+        state.entities.set(itemId, {
+          ...item,
+          media: action.payload?.media,
+          status: PEER_STATUS_ACTIVE,
+        });
         break;
       case ACTION_REMOVE_PEER_CONNECTION:
         if (!item || !itemId) {
           throw new Error(ERROR_PEER_CONNECTION_NOT_FOUND);
         }
-        state.entities.set(itemId, { ...item, status: "INACTIVE" });
+        state.entities.set(itemId, { ...item, status: PEER_STATUS_INACTIVE });
         break;
       case ACTION_CLEANUP_PEER:
         if (itemId) {
@@ -281,8 +295,6 @@ function usePeerState() {
       default:
         throw new Error("Action type not found");
     }
-
-    console.log(state);
 
     return { ...state, entities: new Map(state.entities) };
   }
@@ -375,7 +387,7 @@ function useMasterPeerConnections(config: {
             handlers.iceConnectionStateChange
           );
         }
-        if (status === "INACTIVE") {
+        if (status === PEER_STATUS_INACTIVE) {
           connection?.close();
           media?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
           dispatch({ type: ACTION_CLEANUP_PEER, payload: { id } });
@@ -460,12 +472,12 @@ function useViewerPeerConnection(config: {
   region: string;
 }): {
   error: Error | undefined;
-  peerConnection: RTCPeerConnection | undefined;
-  peerMedia: MediaStream | undefined;
+  peer: Peer;
 } {
   const { channelARN, credentials, region } = config;
   const { accessKeyId, secretAccessKey } = credentials;
   const role = KVSWebRTC.Role.VIEWER;
+  const clientId = useRef<string>();
 
   const kinesisVideoClientRef = useRef<KinesisVideo>(
     new KinesisVideo({
@@ -497,11 +509,17 @@ function useViewerPeerConnection(config: {
   const signalingClient = useSignalingClient({
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.WSS,
+    clientId: clientId.current,
     credentials,
     kinesisVideoClient,
     region,
     role,
   });
+
+  /** Set the client id. */
+  useEffect(() => {
+    clientId.current = uuid();
+  }, [clientId]);
 
   /** Initialize the peer connection with ice servers. */
   useEffect(() => {
@@ -595,7 +613,15 @@ function useViewerPeerConnection(config: {
     };
   }, [peerMedia]);
 
-  return { error: signalingClientError, peerConnection, peerMedia };
+  return {
+    error: signalingClientError,
+    peer: {
+      id: clientId.current,
+      connection: peerConnection,
+      media: peerMedia,
+      status: PEER_STATUS_ACTIVE,
+    },
+  };
 }
 
 /**
@@ -659,7 +685,7 @@ export function useMaster(
 ): {
   error: Error | undefined;
   localMedia: MediaStream | undefined;
-  peerMedia: Map<string, MediaStream> | undefined;
+  peers: Array<Peer>;
 } {
   const {
     channelARN,
@@ -675,26 +701,35 @@ export function useMaster(
     region,
   });
 
-  // useEffect(() => {
-  //   for (const { connection } of Array.from(peerEntities.values())) {
-  //     localMedia
-  //       ?.getTracks()
-  //       .forEach((track: MediaStreamTrack) =>
-  //         connection?.addTrack(track, localMedia)
-  //       );
-  //   }
-  // }, [peerEntities, localMedia]);
+  /** Send local media stream to remote peers. */
+  useEffect(() => {
+    for (const { connection, status } of Array.from(peerEntities.values())) {
+      if (status === PEER_STATUS_PENDING_MEDIA) {
+        localMedia
+          ?.getTracks()
+          .forEach((track: MediaStreamTrack) =>
+            connection?.addTrack(track, localMedia)
+          );
+      }
+    }
+  }, [peerEntities, localMedia]);
 
   /** Construct map of peer media and return to caller. */
-  const peerMedia = new Map();
+  // const peerMedia = new Map();
 
-  for (const { id, media, status } of Array.from(peerEntities.values())) {
-    if (status === "ACTIVE") {
-      peerMedia.set(id, media);
-    }
-  }
+  // for (const { id, media, status } of Array.from(peerEntities.values())) {
+  //   if (status === PEER_STATUS_ACTIVE) {
+  //     peerMedia.set(id, media);
+  //   }
+  // }
 
-  return { error: mediaError, localMedia, peerMedia };
+  return {
+    error: mediaError,
+    localMedia,
+    peers: Array.from(peerEntities.values()).filter(
+      ({ status }) => status === PEER_STATUS_ACTIVE
+    ),
+  };
 }
 
 /**
@@ -705,7 +740,7 @@ export function useViewer(
 ): {
   error: Error | undefined;
   localMedia: MediaStream | undefined;
-  peerMedia: MediaStream | undefined;
+  peer: Peer | undefined;
 } {
   const {
     channelARN,
@@ -714,24 +749,20 @@ export function useViewer(
     media = { audio: true, video: true },
   } = config;
   const { error: streamError, media: localMedia } = useLocalMedia(media);
-  const {
-    error: peerConnectionError,
-    peerConnection,
-    peerMedia,
-  } = useViewerPeerConnection({
+  const { error: peerConnectionError, peer } = useViewerPeerConnection({
     channelARN,
     credentials,
     region,
   });
 
-  /** Pass local media stream to remote peer. */
+  /** Send local media stream to remote peer. */
   useEffect(() => {
     localMedia
       ?.getTracks()
       .forEach((track: MediaStreamTrack) =>
-        peerConnection?.addTrack(track, localMedia)
+        peer.connection?.addTrack(track, localMedia)
       );
-  }, [localMedia, peerConnection]);
+  }, [localMedia, peer.connection]);
 
-  return { error: streamError || peerConnectionError, localMedia, peerMedia };
+  return { error: streamError || peerConnectionError, localMedia, peer };
 }

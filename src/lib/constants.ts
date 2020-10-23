@@ -15,5 +15,10 @@ export const ERROR_PEER_CONNECTION_LOCAL_DESCRIPTION_REQUIRED =
 export const ERROR_PEER_CONNECTION_NOT_INITIALIZED =
   "Peer connection has not been initialized";
 export const ERROR_PEER_CONNECTION_NOT_FOUND = "Peer connection not found";
+export const ERROR_PEER_ID_MISSING = "Peer id is missing.";
 export const ERROR_SIGNALING_CLIENT_NOT_CONNECTED =
   "Signaling client connection has not been established";
+
+export const PEER_STATUS_ACTIVE = "PEER_STATUS_ACTIVE";
+export const PEER_STATUS_INACTIVE = "PEER_STATUS_INACTIVE";
+export const PEER_STATUS_PENDING_MEDIA = "PEER_STATUS_PENDING_MEDIA";
