@@ -12,11 +12,9 @@ import {
   PEER_STATUS_PENDING_MEDIA,
 } from "../constants";
 import type { Peer } from "../Peer";
+import type { PeerState } from "../PeerState";
 
-export type PeerState = {
-  entities: Map<string, Peer>;
-};
-
+/** @description Peer state reducer. */
 export function usePeerState(): [
   PeerState,
   React.Dispatch<{ type: string; payload: Peer }>

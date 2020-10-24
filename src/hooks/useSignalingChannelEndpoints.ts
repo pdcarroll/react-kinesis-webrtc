@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
+/**
+ * @TODO Below import adds the entire AWS SDK to the bundle.
+ * https://github.com/aws/aws-sdk-js/issues/1769
+ **/
 import { KinesisVideo } from "aws-sdk";
 import { ERROR_CHANNEL_ARN_MISSING } from "../constants";
 

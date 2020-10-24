@@ -1,4 +1,8 @@
 import { useEffect, useRef } from "react";
+/**
+ * @TODO Below import adds the entire AWS SDK to the bundle.
+ * https://github.com/aws/aws-sdk-js/issues/1769
+ **/
 import { KinesisVideo } from "aws-sdk";
 import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
 import { useIceServers } from "./useIceServers";

@@ -4,6 +4,8 @@ An experimental library of React hooks for the AWS Kinesis WebRTC JavaScript SDK
 
 Provides a simple, declarative API that can handle peer-to-peer connections within React components.
 
+**This library is still experimental and is therefore not yet suitable for production.**
+
 ## Examples
 
 ### Handle a media stream from a remote master peer:

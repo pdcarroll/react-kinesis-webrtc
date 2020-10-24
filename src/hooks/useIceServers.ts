@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import type { AWSCredentials } from "../AWSCredentials";
+/**
+ * @TODO Below import adds the entire AWS SDK to the bundle.
+ * https://github.com/aws/aws-sdk-js/issues/1769
+ **/
 import { KinesisVideoSignalingChannels } from "aws-sdk";
 import { ERROR_ICE_SERVERS_RESPONSE } from "../constants";
 

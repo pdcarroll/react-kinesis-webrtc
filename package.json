@@ -1,6 +1,6 @@
 {
   "name": "react-kinesis-webrtc",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "React wrapper for AWS Kinesis WebRTC JavaScript SDK",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
