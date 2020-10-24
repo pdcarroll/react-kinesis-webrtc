@@ -2,7 +2,7 @@
 
 An experimental library of React hooks for the AWS Kinesis WebRTC JavaScript SDK ([link](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js)).
 
-This library aims to provide a simple, declarative API for use within React components.
+Provides a simple, declarative API that can handle peer-to-peer connections within React components.
 
 ## Examples
 
@@ -13,7 +13,7 @@ import React, { useEffect, useRef } from "react";
 import { useViewer } from "react-kinesis-webrtc";
 
 function Viewer() {
-  const { peerMediaSrc } = useViewer({
+  const config = {
     credentials: {
       accessKeyId: "YOUR_AWS_ACCESS_KEY_ID",
       secretAccessKey: "YOUR_AWS_SECRET_ACCESS_KEY",
@@ -24,16 +24,19 @@ function Viewer() {
       audio: true,
       video: true,
     },
-  });
+  };
+  const {
+    peer: { media },
+  } = useViewer(config);
 
   const videoRef = useRef();
 
   // Handle the master peer media stream
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.srcObject = peerMediaSrc;
+      videoRef.current.srcObject = media;
     }
-  }, [peerMediaSrc, videoRef]);
+  }, [media, videoRef]);
 
   return <video autoPlay ref={videoRef} />;
 }
@@ -154,18 +157,18 @@ Establishes a master connection using an existing signaling channel. Manages pee
 ```typescript
 {
   error: Error | undefined,
-  localMediaSrc: MediaStream | undefined, // Your local media stream
+  localMedia: MediaStream | undefined, // Your local media stream
   peers: Array<Peer> // Remote viewer peer media streams
 }
 ```
 
-#### Peer Object:
+#### Peer Entity:
 
 ```typescript
 {
   id: string;
   connection: RTCPeerConnection;
-  mediaSrc: MediaStream;
+  media: MediaStream;
 }
 ```
 
@@ -197,11 +200,7 @@ Establishes a viewer connection to an existing, active signaling channel.
 ```typescript
 {
   error: Error | undefined,
-  localMediaSrc: MediaStream | undefined // Your local media stream
+  localMedia: MediaStream | undefined // Your local media stream
   peer: Peer // The remote master peer
 }
 ```
-
-## A note about the API terminology
-
-This library uses the "master/viewer" role names in order to maintain consistency with the Kinesis WebRTC platform. While this language can be perceived as problematic and/or offensive, it remains in use for the sake of clarity. Any feedback regarding this issue is welcome.

@@ -1,1 +1,1 @@
-export { useMaster, useViewer } from "./lib";
+export { useMaster, useViewer } from "./hooks";
