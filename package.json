@@ -1,16 +1,26 @@
 {
   "name": "react-kinesis-webrtc",
   "version": "0.0.1",
-  "description": "React wrapper for AWS Kinesis WebRTC JavaScript SDK",
+  "description": "An experimental library of React hooks for the AWS Kinesis WebRTC JavaScript SDK.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "scripts": {
     "build": "rm -rf dist && rollup -c",
-    "build-dev": "rm -rf dist && tsc --outDir ./dist",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "release": "npm run build && npm publish"
   },
   "author": "Patrick Carroll <pcarroll.design@gmail.com>",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pdcarroll/react-kinesis-webrtc"
+  },
+  "keywords": [
+    "React",
+    "Kinesis",
+    "WebRTC",
+    "Typescript"
+  ],
   "devDependencies": {
     "@rollup/plugin-commonjs": "^15.1.0",
     "@rollup/plugin-node-resolve": "^9.0.0",
