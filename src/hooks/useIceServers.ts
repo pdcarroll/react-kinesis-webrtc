@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import {
+  GetIceServerConfigCommand,
+  KinesisVideoSignalingClient,
+  IceServer,
+} from "@aws-sdk/client-kinesis-video-signaling";
 import type { AWSCredentials } from "../AWSCredentials";
-/**
- * @TODO Below import adds the entire AWS SDK to the bundle.
- * https://github.com/aws/aws-sdk-js/issues/1769
- **/
-import { KinesisVideoSignalingChannels } from "aws-sdk";
 import { ERROR_ICE_SERVERS_RESPONSE } from "../constants";
 
 /**
@@ -16,34 +16,28 @@ export function useIceServers(config: {
   credentials: AWSCredentials;
   region: string;
 }): RTCIceServer[] | undefined {
-  const {
-    channelARN,
-    channelEndpoint,
-    credentials: { accessKeyId, secretAccessKey },
-    region,
-  } = config;
-
+  const { channelARN, channelEndpoint, credentials, region } = config;
   const [iceServers, setIceServers] = useState<RTCIceServer[] | undefined>();
 
   useEffect(() => {
     if (!channelEndpoint) {
       return;
     }
-    const kinesisVideoSignalingChannelsClient = new KinesisVideoSignalingChannels(
+    const kinesisVideoSignalingChannelsClient = new KinesisVideoSignalingClient(
       {
         region,
-        accessKeyId,
-        secretAccessKey,
+        credentials,
         endpoint: channelEndpoint,
-        correctClockSkew: true,
+        // correctClockSkew: true,
       }
     );
 
+    const getIceServerConfigCommand = new GetIceServerConfigCommand({
+      ChannelARN: channelARN,
+    });
+
     kinesisVideoSignalingChannelsClient
-      .getIceServerConfig({
-        ChannelARN: channelARN,
-      })
-      .promise()
+      .send(getIceServerConfigCommand)
       .then((getIceServerConfigResponse) => {
         if (!getIceServerConfigResponse) {
           throw new Error(ERROR_ICE_SERVERS_RESPONSE);
@@ -57,7 +51,7 @@ export function useIceServers(config: {
         ];
 
         getIceServerConfigResponse?.IceServerList?.forEach(
-          (iceServer: KinesisVideoSignalingChannels.IceServer) => {
+          (iceServer: IceServer) => {
             if (!iceServer.Uris) {
               return;
             }
@@ -72,7 +66,7 @@ export function useIceServers(config: {
         return dict;
       })
       .then(setIceServers);
-  }, [accessKeyId, channelARN, channelEndpoint, region, secretAccessKey]);
+  }, [channelARN, channelEndpoint, credentials, region]);
 
   return iceServers;
 }

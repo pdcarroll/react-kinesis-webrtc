@@ -1,10 +1,6 @@
 import { useEffect, useRef } from "react";
-/**
- * @TODO Below import adds the entire AWS SDK to the bundle.
- * https://github.com/aws/aws-sdk-js/issues/1769
- **/
-import { KinesisVideo } from "aws-sdk";
 import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
+import { KinesisVideo } from "@aws-sdk/client-kinesis-video";
 import { useIceServers } from "./useIceServers";
 import { useLocalMedia } from "./useLocalMedia";
 import { usePeerState } from "./usePeerState";
@@ -34,15 +30,13 @@ function useMasterPeerConnections(config: {
   region: string;
 }): { peerEntities: PeerState["entities"] } {
   const { channelARN, credentials, region } = config;
-  const { accessKeyId, secretAccessKey } = credentials;
   const role = KVSWebRTC.Role.MASTER;
 
   const kinesisVideoClientRef = useRef<KinesisVideo>(
     new KinesisVideo({
       region,
-      accessKeyId,
-      secretAccessKey,
-      correctClockSkew: true,
+      credentials,
+      // correctClockSkew: true,
     })
   );
 
