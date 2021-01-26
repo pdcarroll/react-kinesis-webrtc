@@ -28,7 +28,6 @@ export function useIceServers(config: {
         region,
         credentials,
         endpoint: channelEndpoint,
-        // correctClockSkew: true,
       }
     );
 
@@ -66,7 +65,7 @@ export function useIceServers(config: {
         return dict;
       })
       .then(setIceServers);
-  }, [channelARN, channelEndpoint, credentials, region]);
+  }, [credentials.accessKeyId, channelARN, channelEndpoint, region, credentials.secretAccessKey]);
 
   return iceServers;
 }
