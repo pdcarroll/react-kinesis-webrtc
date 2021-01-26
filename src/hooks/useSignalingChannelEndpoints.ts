@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
-/**
- * @TODO Below import adds the entire AWS SDK to the bundle.
- * https://github.com/aws/aws-sdk-js/issues/1769
- **/
-import { KinesisVideo } from "aws-sdk";
+import {
+  GetSignalingChannelEndpointOutput,
+  KinesisVideo,
+  ResourceEndpointListItem,
+} from "@aws-sdk/client-kinesis-video";
 import { ERROR_CHANNEL_ARN_MISSING } from "../constants";
 
 type SignalingChannelEndpoints = {
@@ -16,12 +16,12 @@ type SignalingChannelEndpoints = {
  * @description Maps AWS KinesisVideo output to readable format.
  **/
 function mapSignalingChannelEndpoints(
-  data: KinesisVideo.GetSignalingChannelEndpointOutput
+  data: GetSignalingChannelEndpointOutput
 ): SignalingChannelEndpoints {
   const endpointsByProtocol = data.ResourceEndpointList?.reduce(
     (
       endpoints: SignalingChannelEndpoints,
-      endpoint: KinesisVideo.ResourceEndpointListItem
+      endpoint: ResourceEndpointListItem
     ) => {
       if (!endpoint.Protocol) {
         return endpoints;
@@ -60,7 +60,6 @@ export function useSignalingChannelEndpoints(config: {
           Role: role,
         },
       })
-      .promise()
       .then(mapSignalingChannelEndpoints)
       .then(setEndpoints);
   }, [channelARN, kinesisVideoClient, role]);

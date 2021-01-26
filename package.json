@@ -46,8 +46,9 @@
     "react": "^16.18.0"
   },
   "dependencies": {
+    "@aws-sdk/client-kinesis-video": "^3.3.0",
+    "@aws-sdk/client-kinesis-video-signaling": "^3.3.0",
     "amazon-kinesis-video-streams-webrtc": "^1.0.8",
-    "aws-sdk": "^2.749.0",
     "uuid": "^8.3.0"
   }
 }
