@@ -36,7 +36,6 @@ function useMasterPeerConnections(config: {
     new KinesisVideo({
       region,
       credentials,
-      // correctClockSkew: true,
     })
   );
 
@@ -69,7 +68,6 @@ function useMasterPeerConnections(config: {
   useEffect(() => {
     const peerEntities = Array.from(peerState.entities.values());
 
-    // Add event handlers
     for (const { connection, handlers } of peerEntities) {
       if (handlers?.iceCandidate) {
         connection?.addEventListener("icecandidate", handlers.iceCandidate);
@@ -86,7 +84,6 @@ function useMasterPeerConnections(config: {
     }
 
     return function cleanup() {
-      // Remove event handlers
       for (const { id, connection, handlers, media, status } of peerEntities) {
         if (handlers?.iceCandidate) {
           connection?.removeEventListener(
