@@ -43,9 +43,15 @@ export function useSignalingChannelEndpoints(config: {
   channelARN: string;
   role: KVSWebRTC.Role;
   kinesisVideoClient: KinesisVideo;
-}): SignalingChannelEndpoints | undefined {
+}): {
+  error: Error | undefined;
+  signalingChannelEndpoints: SignalingChannelEndpoints | undefined;
+} {
   const { channelARN, kinesisVideoClient, role } = config;
-  const [endpoints, setEndpoints] = useState<SignalingChannelEndpoints>();
+  const [error, setError] = useState();
+  const [signalingChannelEndpoints, setSignalingChannelEndpoints] = useState<
+    SignalingChannelEndpoints
+  >();
 
   if (!channelARN) {
     throw new Error(ERROR_CHANNEL_ARN_MISSING);
@@ -61,8 +67,9 @@ export function useSignalingChannelEndpoints(config: {
         },
       })
       .then(mapSignalingChannelEndpoints)
-      .then(setEndpoints);
+      .then(setSignalingChannelEndpoints)
+      .catch(setError);
   }, [channelARN, kinesisVideoClient, role]);
 
-  return endpoints;
+  return { error, signalingChannelEndpoints };
 }

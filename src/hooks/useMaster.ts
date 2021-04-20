@@ -28,7 +28,7 @@ function useMasterPeerConnections(config: {
   credentials: AWSCredentials;
   localMedia?: MediaStream;
   region: string;
-}): { peerEntities: PeerState["entities"] } {
+}): { error: Error | undefined; peerEntities: PeerState["entities"] } {
   const { channelARN, credentials, region } = config;
   const role = KVSWebRTC.Role.MASTER;
 
@@ -42,13 +42,16 @@ function useMasterPeerConnections(config: {
   const kinesisVideoClient = kinesisVideoClientRef.current;
   const [peerState, dispatch] = usePeerState();
 
-  const signalingChannelEndpoints = useSignalingChannelEndpoints({
+  const {
+    error: signalingChannelEndpointsError,
+    signalingChannelEndpoints,
+  } = useSignalingChannelEndpoints({
     channelARN,
     kinesisVideoClient,
     role,
   });
 
-  const signalingClient = useSignalingClient({
+  const { error: signalingClientError, signalingClient } = useSignalingClient({
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.WSS,
     credentials,
@@ -57,7 +60,7 @@ function useMasterPeerConnections(config: {
     role,
   });
 
-  const iceServers = useIceServers({
+  const { error: iceServersError, iceServers } = useIceServers({
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.HTTPS,
     credentials,
@@ -173,7 +176,11 @@ function useMasterPeerConnections(config: {
     };
   }, [dispatch, iceServers, signalingClient]);
 
-  return { peerEntities: peerState.entities };
+  return {
+    error:
+      signalingChannelEndpointsError || signalingClientError || iceServersError,
+    peerEntities: peerState.entities,
+  };
 }
 
 /**
@@ -186,6 +193,7 @@ export function useMaster(
   localMedia: MediaStream | undefined;
   peers: Array<Peer>;
 } {
+  console.log(config);
   const {
     channelARN,
     credentials,
@@ -193,7 +201,10 @@ export function useMaster(
     media = { audio: true, video: true },
   } = config;
   const { error: mediaError, media: localMedia } = useLocalMedia(media);
-  const { peerEntities } = useMasterPeerConnections({
+  const {
+    error: peerConnectionsError,
+    peerEntities,
+  } = useMasterPeerConnections({
     channelARN,
     credentials,
     localMedia,
@@ -214,7 +225,7 @@ export function useMaster(
   }, [peerEntities, localMedia]);
 
   return {
-    error: mediaError,
+    error: mediaError || peerConnectionsError,
     localMedia,
     peers: Array.from(peerEntities.values()).filter(
       ({ status }) => status === PEER_STATUS_ACTIVE
