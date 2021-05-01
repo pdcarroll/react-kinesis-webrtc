@@ -16,7 +16,12 @@ export function useIceServers(config: {
   credentials: AWSCredentials;
   region: string;
 }): { error: Error | undefined; iceServers: RTCIceServer[] | undefined } {
-  const { channelARN, channelEndpoint, credentials, region } = config;
+  const {
+    channelARN,
+    channelEndpoint,
+    credentials: { accessKeyId = "", secretAccessKey = "" } = {},
+    region,
+  } = config;
   const [error, setError] = useState<Error>();
   const [iceServers, setIceServers] = useState<RTCIceServer[]>();
 
@@ -28,8 +33,8 @@ export function useIceServers(config: {
       {
         region,
         credentials: {
-          accessKeyId: credentials.accessKeyId,
-          secretAccessKey: credentials.secretAccessKey,
+          accessKeyId,
+          secretAccessKey,
         },
         endpoint: channelEndpoint,
       }
@@ -70,13 +75,7 @@ export function useIceServers(config: {
       })
       .then(setIceServers)
       .catch(setError);
-  }, [
-    credentials.accessKeyId,
-    channelARN,
-    channelEndpoint,
-    region,
-    credentials.secretAccessKey,
-  ]);
+  }, [accessKeyId, channelARN, channelEndpoint, region, secretAccessKey]);
 
   return { error, iceServers };
 }

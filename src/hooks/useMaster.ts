@@ -41,6 +41,7 @@ function useMasterPeerConnections(config: {
 
   const kinesisVideoClient = kinesisVideoClientRef.current;
   const [peerState, dispatch] = usePeerState();
+  const { entities: peerStateEntities } = peerState;
 
   const {
     error: signalingChannelEndpointsError,
@@ -69,7 +70,15 @@ function useMasterPeerConnections(config: {
 
   /** Handle peer connections. */
   useEffect(() => {
-    const peerEntities = Array.from(peerState.entities.values());
+    const peerEntities = Array.from(peerStateEntities.values());
+
+    if (
+      iceServersError ||
+      signalingChannelEndpointsError ||
+      signalingClientError
+    ) {
+      return cleanup;
+    }
 
     for (const { connection, handlers } of peerEntities) {
       if (handlers?.iceCandidate) {
@@ -86,7 +95,7 @@ function useMasterPeerConnections(config: {
       }
     }
 
-    return function cleanup() {
+    function cleanup() {
       for (const { id, connection, handlers, media, status } of peerEntities) {
         if (handlers?.iceCandidate) {
           connection?.removeEventListener(
@@ -109,8 +118,16 @@ function useMasterPeerConnections(config: {
           dispatch({ type: ACTION_CLEANUP_PEER, payload: { id } });
         }
       }
-    };
-  }, [peerState.entities, dispatch]);
+    }
+
+    return cleanup;
+  }, [
+    dispatch,
+    iceServersError,
+    peerStateEntities,
+    signalingChannelEndpointsError,
+    signalingClientError,
+  ]);
 
   /** Handle signaling client events. */
   useEffect(() => {
@@ -193,7 +210,6 @@ export function useMaster(
   localMedia: MediaStream | undefined;
   peers: Array<Peer>;
 } {
-  console.log(config);
   const {
     channelARN,
     credentials,
@@ -215,11 +231,9 @@ export function useMaster(
   useEffect(() => {
     for (const { connection, status } of Array.from(peerEntities.values())) {
       if (status === PEER_STATUS_PENDING_MEDIA) {
-        localMedia
-          ?.getTracks()
-          .forEach((track: MediaStreamTrack) =>
-            connection?.addTrack(track, localMedia)
-          );
+        localMedia?.getTracks().forEach((track: MediaStreamTrack) => {
+          connection?.addTrack(track, localMedia);
+        });
       }
     }
   }, [peerEntities, localMedia]);

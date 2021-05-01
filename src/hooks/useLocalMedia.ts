@@ -14,10 +14,20 @@ export function useLocalMedia({
   const [error, setError] = useState<Error>();
 
   useEffect(() => {
+    let cancelled = false;
     navigator.mediaDevices
       .getUserMedia({ video, audio })
-      .then(setMedia)
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+          return;
+        }
+        setMedia(stream);
+      })
       .catch(setError);
+    return () => {
+      cancelled = true;
+    };
   }, [video, audio]);
 
   useEffect(() => {

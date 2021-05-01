@@ -21,8 +21,8 @@ export function useSignalingClient(config: {
   const {
     channelARN,
     channelEndpoint,
+    credentials: { accessKeyId = "", secretAccessKey = "" } = {},
     clientId,
-    credentials: { accessKeyId, secretAccessKey },
     kinesisVideoClient,
     region,
     role,
