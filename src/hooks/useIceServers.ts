@@ -15,9 +15,15 @@ export function useIceServers(config: {
   channelEndpoint?: string;
   credentials: AWSCredentials;
   region: string;
-}): RTCIceServer[] | undefined {
-  const { channelARN, channelEndpoint, credentials, region } = config;
-  const [iceServers, setIceServers] = useState<RTCIceServer[] | undefined>();
+}): { error: Error | undefined; iceServers: RTCIceServer[] | undefined } {
+  const {
+    channelARN,
+    channelEndpoint,
+    credentials: { accessKeyId = "", secretAccessKey = "" } = {},
+    region,
+  } = config;
+  const [error, setError] = useState<Error>();
+  const [iceServers, setIceServers] = useState<RTCIceServer[]>();
 
   useEffect(() => {
     if (!channelEndpoint) {
@@ -26,7 +32,10 @@ export function useIceServers(config: {
     const kinesisVideoSignalingChannelsClient = new KinesisVideoSignalingClient(
       {
         region,
-        credentials,
+        credentials: {
+          accessKeyId,
+          secretAccessKey,
+        },
         endpoint: channelEndpoint,
       }
     );
@@ -64,8 +73,9 @@ export function useIceServers(config: {
 
         return dict;
       })
-      .then(setIceServers);
-  }, [credentials.accessKeyId, channelARN, channelEndpoint, region, credentials.secretAccessKey]);
+      .then(setIceServers)
+      .catch(setError);
+  }, [accessKeyId, channelARN, channelEndpoint, region, secretAccessKey]);
 
-  return iceServers;
+  return { error, iceServers };
 }

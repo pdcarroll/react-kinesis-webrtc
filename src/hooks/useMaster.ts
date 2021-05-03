@@ -28,7 +28,7 @@ function useMasterPeerConnections(config: {
   credentials: AWSCredentials;
   localMedia?: MediaStream;
   region: string;
-}): { peerEntities: PeerState["entities"] } {
+}): { error: Error | undefined; peerEntities: PeerState["entities"] } {
   const { channelARN, credentials, region } = config;
   const role = KVSWebRTC.Role.MASTER;
 
@@ -36,20 +36,23 @@ function useMasterPeerConnections(config: {
     new KinesisVideo({
       region,
       credentials,
-      // correctClockSkew: true,
     })
   );
 
   const kinesisVideoClient = kinesisVideoClientRef.current;
   const [peerState, dispatch] = usePeerState();
+  const { entities: peerStateEntities } = peerState;
 
-  const signalingChannelEndpoints = useSignalingChannelEndpoints({
+  const {
+    error: signalingChannelEndpointsError,
+    signalingChannelEndpoints,
+  } = useSignalingChannelEndpoints({
     channelARN,
     kinesisVideoClient,
     role,
   });
 
-  const signalingClient = useSignalingClient({
+  const { error: signalingClientError, signalingClient } = useSignalingClient({
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.WSS,
     credentials,
@@ -58,7 +61,7 @@ function useMasterPeerConnections(config: {
     role,
   });
 
-  const iceServers = useIceServers({
+  const { error: iceServersError, iceServers } = useIceServers({
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.HTTPS,
     credentials,
@@ -67,9 +70,16 @@ function useMasterPeerConnections(config: {
 
   /** Handle peer connections. */
   useEffect(() => {
-    const peerEntities = Array.from(peerState.entities.values());
+    const peerEntities = Array.from(peerStateEntities.values());
 
-    // Add event handlers
+    if (
+      iceServersError ||
+      signalingChannelEndpointsError ||
+      signalingClientError
+    ) {
+      return cleanup;
+    }
+
     for (const { connection, handlers } of peerEntities) {
       if (handlers?.iceCandidate) {
         connection?.addEventListener("icecandidate", handlers.iceCandidate);
@@ -85,8 +95,7 @@ function useMasterPeerConnections(config: {
       }
     }
 
-    return function cleanup() {
-      // Remove event handlers
+    function cleanup() {
       for (const { id, connection, handlers, media, status } of peerEntities) {
         if (handlers?.iceCandidate) {
           connection?.removeEventListener(
@@ -109,8 +118,16 @@ function useMasterPeerConnections(config: {
           dispatch({ type: ACTION_CLEANUP_PEER, payload: { id } });
         }
       }
-    };
-  }, [peerState.entities, dispatch]);
+    }
+
+    return cleanup;
+  }, [
+    dispatch,
+    iceServersError,
+    peerStateEntities,
+    signalingChannelEndpointsError,
+    signalingClientError,
+  ]);
 
   /** Handle signaling client events. */
   useEffect(() => {
@@ -176,7 +193,11 @@ function useMasterPeerConnections(config: {
     };
   }, [dispatch, iceServers, signalingClient]);
 
-  return { peerEntities: peerState.entities };
+  return {
+    error:
+      signalingChannelEndpointsError || signalingClientError || iceServersError,
+    peerEntities: peerState.entities,
+  };
 }
 
 /**
@@ -196,7 +217,10 @@ export function useMaster(
     media = { audio: true, video: true },
   } = config;
   const { error: mediaError, media: localMedia } = useLocalMedia(media);
-  const { peerEntities } = useMasterPeerConnections({
+  const {
+    error: peerConnectionsError,
+    peerEntities,
+  } = useMasterPeerConnections({
     channelARN,
     credentials,
     localMedia,
@@ -207,17 +231,15 @@ export function useMaster(
   useEffect(() => {
     for (const { connection, status } of Array.from(peerEntities.values())) {
       if (status === PEER_STATUS_PENDING_MEDIA) {
-        localMedia
-          ?.getTracks()
-          .forEach((track: MediaStreamTrack) =>
-            connection?.addTrack(track, localMedia)
-          );
+        localMedia?.getTracks().forEach((track: MediaStreamTrack) => {
+          connection?.addTrack(track, localMedia);
+        });
       }
     }
   }, [peerEntities, localMedia]);
 
   return {
-    error: mediaError,
+    error: mediaError || peerConnectionsError,
     localMedia,
     peers: Array.from(peerEntities.values()).filter(
       ({ status }) => status === PEER_STATUS_ACTIVE

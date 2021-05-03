@@ -36,29 +36,30 @@ function useViewerPeerConnection(config: {
     new KinesisVideo({
       region,
       credentials,
-      // correctClockSkew: true,
     })
   );
 
   const kinesisVideoClient = kinesisVideoClientRef.current;
   const [peerConnection, setPeerConnection] = useState<RTCPeerConnection>();
   const [peerMedia, setPeerMedia] = useState<MediaStream>();
-  const [signalingClientError, setSignalingClientError] = useState<Error>();
 
-  const signalingChannelEndpoints = useSignalingChannelEndpoints({
+  const {
+    error: signalingChannelEndpointsError,
+    signalingChannelEndpoints,
+  } = useSignalingChannelEndpoints({
     channelARN,
     kinesisVideoClient,
     role,
   });
 
-  const iceServers = useIceServers({
+  const { error: iceServersError, iceServers } = useIceServers({
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.HTTPS,
     credentials,
     region,
   });
 
-  const signalingClient = useSignalingClient({
+  const { error: signalingClientError, signalingClient } = useSignalingClient({
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.WSS,
     clientId: clientId.current,
@@ -139,7 +140,6 @@ function useViewerPeerConnection(config: {
     signalingClient?.on("open", handleOpen);
     signalingClient?.on("sdpAnswer", handleSdpAnswer);
     signalingClient?.on("iceCandidate", handleSignalingChannelIceCandidate);
-    signalingClient?.on("error", setSignalingClientError);
 
     peerConnection?.addEventListener("icecandidate", handlePeerIceCandidate);
     peerConnection?.addEventListener("track", handlePeerTrack);
@@ -166,7 +166,8 @@ function useViewerPeerConnection(config: {
   }, [peerMedia]);
 
   return {
-    error: signalingClientError,
+    error:
+      signalingChannelEndpointsError || iceServersError || signalingClientError,
     peer: {
       id: clientId.current,
       connection: peerConnection,

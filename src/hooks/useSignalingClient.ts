@@ -14,18 +14,24 @@ export function useSignalingClient(config: {
   region: string;
   role: KVSWebRTC.Role;
   kinesisVideoClient: KinesisVideo;
-}): KVSWebRTC.SignalingClient | undefined {
+}): {
+  error: Error | undefined;
+  signalingClient: KVSWebRTC.SignalingClient | undefined;
+} {
   const {
     channelARN,
     channelEndpoint,
+    credentials: { accessKeyId = "", secretAccessKey = "" } = {},
     clientId,
-    credentials: { accessKeyId, secretAccessKey },
     kinesisVideoClient,
     region,
     role,
   } = config;
 
-  const [client, setClient] = useState<KVSWebRTC.SignalingClient>();
+  const [signalingClient, setSignalingClient] = useState<
+    KVSWebRTC.SignalingClient
+  >();
+  const [signalingClientError, setSignalingClientError] = useState<Error>();
   const { systemClockOffset } = kinesisVideoClient.config;
 
   /** Create signaling client when endpoints are available. */
@@ -36,7 +42,7 @@ export function useSignalingClient(config: {
     if (!clientId && role === KVSWebRTC.Role.VIEWER) {
       return;
     }
-    setClient(
+    setSignalingClient(
       new KVSWebRTC.SignalingClient({
         channelARN,
         channelEndpoint,
@@ -60,12 +66,18 @@ export function useSignalingClient(config: {
 
   /** Handle signaling client lifecycle. */
   useEffect(() => {
-    client?.open();
+    function handleSignalingClientError(error: Error) {
+      setSignalingClientError(error);
+    }
+
+    signalingClient?.on("error", handleSignalingClientError);
+    signalingClient?.open();
 
     return function cleanup() {
-      client?.close();
+      signalingClient?.close();
+      signalingClient?.off("error", handleSignalingClientError);
     };
-  }, [client]);
+  }, [signalingClient]);
 
-  return client;
+  return { error: signalingClientError, signalingClient };
 }
