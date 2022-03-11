@@ -4,16 +4,19 @@ import { useEffect, useState } from "react";
  * @description Opens and returns local media stream. Closes stream on cleanup.
  **/
 export function useLocalMedia({
-  audio = true,
-  video = true,
+  audio,
+  video,
 }: {
   audio?: boolean;
   video?: boolean | MediaTrackConstraints;
-}): { error: Error | undefined; media: MediaStream | undefined } {
+} = {}): { error: Error | undefined; media: MediaStream | undefined } {
   const [media, setMedia] = useState<MediaStream>();
   const [error, setError] = useState<Error>();
 
   useEffect(() => {
+    if (!video && !audio) {
+      return;
+    }
     let cancelled = false;
     navigator.mediaDevices
       .getUserMedia({ video, audio })

@@ -206,3 +206,7 @@ Establishes a viewer connection to an existing, active signaling channel.
   peer: Peer // The remote master peer
 }
 ```
+
+#### Viewer Mode
+
+To create a viewer that doesn't establish a two-way media connection with a remote peer(s), omit the `media` argument from the `config` object. This will create a viewer that doesn't attempt to access the local user's camera or microphone.

@@ -24,11 +24,12 @@ function useViewerPeerConnection(config: {
   channelARN: string;
   credentials: AWSCredentials;
   region: string;
+  viewerMode: boolean;
 }): {
   error: Error | undefined;
   peer: Peer;
 } {
-  const { channelARN, credentials, region } = config;
+  const { channelARN, credentials, region, viewerMode } = config;
   const role = KVSWebRTC.Role.VIEWER;
   const clientId = useRef<string>();
 
@@ -93,6 +94,12 @@ function useViewerPeerConnection(config: {
     }
 
     async function handleOpen() {
+      if (viewerMode) {
+        peerConnection?.addTransceiver("video");
+        peerConnection
+          ?.getTransceivers()
+          .forEach((t) => (t.direction = "recvonly"));
+      }
       await peerConnection?.setLocalDescription(
         await peerConnection?.createOffer({
           offerToReceiveAudio: true,
@@ -156,7 +163,7 @@ function useViewerPeerConnection(config: {
       peerConnection?.removeEventListener("track", handlePeerTrack);
       peerConnection?.close();
     };
-  }, [peerConnection, signalingClient]);
+  }, [peerConnection, signalingClient, viewerMode]);
 
   /** Handle peer media lifecycle. */
   useEffect(() => {
@@ -187,17 +194,13 @@ export function useViewer(
   localMedia: MediaStream | undefined;
   peer: Peer | undefined;
 } {
-  const {
-    channelARN,
-    credentials,
-    region,
-    media = { audio: true, video: true },
-  } = config;
+  const { channelARN, credentials, region, media } = config;
   const { error: streamError, media: localMedia } = useLocalMedia(media);
   const { error: peerConnectionError, peer } = useViewerPeerConnection({
     channelARN,
     credentials,
     region,
+    viewerMode: Boolean(media),
   });
 
   /** Send local media stream to remote peer. */
