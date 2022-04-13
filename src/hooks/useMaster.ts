@@ -80,7 +80,13 @@ function useMasterPeerConnections(config: {
       return cleanup;
     }
 
-    for (const { connection, handlers } of peerEntities) {
+    for (const { connection, handlers, id, media, status } of peerEntities) {
+      if (status === PEER_STATUS_INACTIVE) {
+        connection?.close();
+        media?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+        dispatch({ type: ACTION_CLEANUP_PEER, payload: { id } });
+        continue;
+      }
       if (handlers?.iceCandidate) {
         connection?.addEventListener("icecandidate", handlers.iceCandidate);
       }
@@ -96,7 +102,7 @@ function useMasterPeerConnections(config: {
     }
 
     function cleanup() {
-      for (const { id, connection, handlers, media, status } of peerEntities) {
+      for (const { connection, handlers } of peerEntities) {
         if (handlers?.iceCandidate) {
           connection?.removeEventListener(
             "icecandidate",
@@ -111,11 +117,6 @@ function useMasterPeerConnections(config: {
             "iceconnectionstatechange",
             handlers.iceConnectionStateChange
           );
-        }
-        if (status === PEER_STATUS_INACTIVE) {
-          connection?.close();
-          media?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-          dispatch({ type: ACTION_CLEANUP_PEER, payload: { id } });
         }
       }
     }
@@ -163,6 +164,7 @@ function useMasterPeerConnections(config: {
 
       function handleIceConnectionStateChange() {
         if (connection.iceConnectionState === "disconnected") {
+          console.log("Disconnected peer, setting to INACTIVE...");
           dispatch({ type: ACTION_REMOVE_PEER_CONNECTION, payload: { id } });
         }
       }
