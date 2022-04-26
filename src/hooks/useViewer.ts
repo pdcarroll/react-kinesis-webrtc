@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { KinesisVideo } from "@aws-sdk/client-kinesis-video";
-import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
+import { Role, SignalingClient } from "amazon-kinesis-video-streams-webrtc";
 import { v4 as uuid } from "uuid";
 import { useIceServers } from "./useIceServers";
 import { useLocalMedia } from "./useLocalMedia";
@@ -11,26 +11,25 @@ import {
   ERROR_PEER_CONNECTION_LOCAL_DESCRIPTION_REQUIRED,
   ERROR_PEER_CONNECTION_NOT_INITIALIZED,
   ERROR_SIGNALING_CLIENT_NOT_CONNECTED,
-  PEER_STATUS_ACTIVE,
 } from "../constants";
-import type { AWSCredentials } from "../AWSCredentials";
-import type { ConfigOptions } from "../ConfigOptions";
-import type { Peer } from "../Peer";
+import { ConfigOptions, PeerConfigOptions } from "../ConfigOptions";
+import { Peer } from "../Peer";
+import { getLogger } from "../logger";
 
 /**
  * @description Handles peer connection to a viewer signaling client.
  **/
-function useViewerPeerConnection(config: {
-  channelARN: string;
-  credentials: AWSCredentials;
-  region: string;
-}): {
+function useViewerPeerConnection(
+  config: ConfigOptions
+): {
+  _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
   peer: Peer;
 } {
-  const { channelARN, credentials, region } = config;
-  const role = KVSWebRTC.Role.VIEWER;
-  const clientId = useRef<string>();
+  const { channelARN, credentials, debug = false, region } = config;
+  const logger = useRef(getLogger({ debug }));
+  const role = Role.VIEWER;
+  const clientId = useRef<string>(uuid());
 
   const kinesisVideoClientRef = useRef<KinesisVideo>(
     new KinesisVideo({
@@ -64,15 +63,10 @@ function useViewerPeerConnection(config: {
     channelEndpoint: signalingChannelEndpoints?.WSS,
     clientId: clientId.current,
     credentials,
-    kinesisVideoClient,
     region,
     role,
+    systemClockOffset: kinesisVideoClient.config.systemClockOffset,
   });
-
-  /** Set the client id. */
-  useEffect(() => {
-    clientId.current = uuid();
-  }, [clientId]);
 
   /** Initialize the peer connection with ice servers. */
   useEffect(() => {
@@ -93,47 +87,67 @@ function useViewerPeerConnection(config: {
     }
 
     async function handleOpen() {
-      await peerConnection?.setLocalDescription(
-        await peerConnection?.createOffer({
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: true,
-        })
-      );
+      logger.current.logViewer(`[${clientId.current}] signaling client opened`);
+
+      const sessionDescription = await peerConnection?.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+
+      await peerConnection?.setLocalDescription(sessionDescription);
 
       if (!peerConnection?.localDescription) {
         throw new Error(ERROR_PEER_CONNECTION_LOCAL_DESCRIPTION_REQUIRED);
       }
 
+      logger.current.logViewer(`[${clientId.current}] sending sdp offer`);
+
       signalingClient?.sendSdpOffer(peerConnection.localDescription);
     }
 
     async function handleSdpAnswer(answer: RTCSessionDescriptionInit) {
+      logger.current.logViewer(`[${clientId.current}] received sdp answer`);
+
       if (!peerConnection) {
         throw new Error(ERROR_PEER_CONNECTION_NOT_INITIALIZED);
       }
+
       await peerConnection.setRemoteDescription(answer);
     }
 
     function handleSignalingChannelIceCandidate(candidate: RTCIceCandidate) {
+      logger.current.logViewer(
+        `[${clientId.current}] received signaling channel ice candidate`
+      );
+
       if (!candidate) {
         throw new Error(ERROR_ICE_CANDIDATE_NOT_FOUND);
       }
+
       if (!peerConnection) {
         throw new Error(ERROR_PEER_CONNECTION_NOT_INITIALIZED);
       }
+
       peerConnection?.addIceCandidate(candidate);
     }
 
     function handlePeerIceCandidate({ candidate }: RTCPeerConnectionIceEvent) {
+      logger.current.logViewer(
+        `[${clientId.current}] received peer ice candidate`
+      );
+
       if (!signalingClient) {
         throw new Error(ERROR_SIGNALING_CLIENT_NOT_CONNECTED);
       }
+
       if (candidate) {
         signalingClient.sendIceCandidate(candidate);
       }
     }
 
     function handlePeerTrack({ streams = [] }: RTCTrackEvent) {
+      logger.current.logViewer(`[${clientId.current}] received peer track`);
+
       setPeerMedia(streams[0]);
     }
 
@@ -145,6 +159,8 @@ function useViewerPeerConnection(config: {
     peerConnection?.addEventListener("track", handlePeerTrack);
 
     return function cleanup() {
+      logger.current.logViewer(`[${clientId.current}] cleanup`);
+
       signalingClient?.off("open", handleOpen);
       signalingClient?.off("sdpAnswer", handleSdpAnswer);
       signalingClient?.off("iceCandidate", handleSignalingChannelIceCandidate);
@@ -156,7 +172,7 @@ function useViewerPeerConnection(config: {
       peerConnection?.removeEventListener("track", handlePeerTrack);
       peerConnection?.close();
     };
-  }, [peerConnection, signalingClient]);
+  }, [clientId, logger, peerConnection, signalingClient]);
 
   /** Handle peer media lifecycle. */
   useEffect(() => {
@@ -166,13 +182,13 @@ function useViewerPeerConnection(config: {
   }, [peerMedia]);
 
   return {
+    _signalingClient: signalingClient,
     error:
       signalingChannelEndpointsError || iceServersError || signalingClientError,
     peer: {
       id: clientId.current,
       connection: peerConnection,
       media: peerMedia,
-      status: PEER_STATUS_ACTIVE,
     },
   };
 }
@@ -181,8 +197,9 @@ function useViewerPeerConnection(config: {
  * @description Opens a viewer connection to an active master signaling channel.
  **/
 export function useViewer(
-  config: ConfigOptions
+  config: PeerConfigOptions
 ): {
+  _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
   localMedia: MediaStream | undefined;
   peer: Peer | undefined;
@@ -190,24 +207,37 @@ export function useViewer(
   const {
     channelARN,
     credentials,
+    debug,
     region,
     media = { audio: true, video: true },
   } = config;
   const { error: streamError, media: localMedia } = useLocalMedia(media);
-  const { error: peerConnectionError, peer } = useViewerPeerConnection({
+  const {
+    _signalingClient,
+    error: peerConnectionError,
+    peer,
+  } = useViewerPeerConnection({
     channelARN,
     credentials,
+    debug,
     region,
   });
 
   /** Send local media stream to remote peer. */
   useEffect(() => {
-    localMedia
-      ?.getTracks()
-      .forEach((track: MediaStreamTrack) =>
-        peer.connection?.addTrack(track, localMedia)
-      );
+    if (!localMedia || !peer.connection) {
+      return;
+    }
+
+    localMedia.getTracks().forEach((track: MediaStreamTrack) => {
+      (peer.connection as RTCPeerConnection).addTrack(track, localMedia);
+    });
   }, [localMedia, peer.connection]);
 
-  return { error: streamError || peerConnectionError, localMedia, peer };
+  return {
+    _signalingClient,
+    error: streamError || peerConnectionError,
+    localMedia,
+    peer,
+  };
 }

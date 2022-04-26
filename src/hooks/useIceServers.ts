@@ -4,8 +4,9 @@ import {
   KinesisVideoSignalingClient,
   IceServer,
 } from "@aws-sdk/client-kinesis-video-signaling";
-import type { AWSCredentials } from "../AWSCredentials";
+import { AWSCredentials } from "../AWSCredentials";
 import { ERROR_ICE_SERVERS_RESPONSE } from "../constants";
+import { withErrorLog } from "../withErrorLog";
 
 /**
  * @description Fetches ice servers for a signaling channel.
@@ -29,6 +30,9 @@ export function useIceServers(config: {
     if (!channelEndpoint) {
       return;
     }
+
+    let isCancelled = false;
+
     const kinesisVideoSignalingChannelsClient = new KinesisVideoSignalingClient(
       {
         region,
@@ -50,6 +54,7 @@ export function useIceServers(config: {
         if (!getIceServerConfigResponse) {
           throw new Error(ERROR_ICE_SERVERS_RESPONSE);
         }
+
         if (!getIceServerConfigResponse.IceServerList) {
           throw new Error(ERROR_ICE_SERVERS_RESPONSE);
         }
@@ -73,8 +78,24 @@ export function useIceServers(config: {
 
         return dict;
       })
-      .then(setIceServers)
-      .catch(setError);
+      .then((iceServers) => {
+        if (isCancelled) {
+          return;
+        }
+        setIceServers(iceServers);
+      })
+      .catch(
+        withErrorLog((error) => {
+          if (isCancelled) {
+            return;
+          }
+          setError(error);
+        })
+      );
+
+    return function cleanup() {
+      isCancelled = true;
+    };
   }, [accessKeyId, channelARN, channelEndpoint, region, secretAccessKey]);
 
   return { error, iceServers };

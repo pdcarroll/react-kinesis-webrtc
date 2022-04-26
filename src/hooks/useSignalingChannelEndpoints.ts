@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
-import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
 import {
+  GetSignalingChannelEndpointCommand,
   GetSignalingChannelEndpointOutput,
   KinesisVideo,
   ResourceEndpointListItem,
 } from "@aws-sdk/client-kinesis-video";
-import { ERROR_CHANNEL_ARN_MISSING } from "../constants";
+import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
+import {
+  ERROR_CHANNEL_ARN_MISSING,
+  ERROR_RESOURCE_ENDPOINT_LIST_MISSING,
+} from "../constants";
+import { withErrorLog } from "../withErrorLog";
 
 type SignalingChannelEndpoints = {
   WSS?: string;
@@ -18,7 +23,11 @@ type SignalingChannelEndpoints = {
 function mapSignalingChannelEndpoints(
   data: GetSignalingChannelEndpointOutput
 ): SignalingChannelEndpoints {
-  const endpointsByProtocol = data.ResourceEndpointList?.reduce(
+  if (!Array.isArray(data.ResourceEndpointList)) {
+    throw new Error(ERROR_RESOURCE_ENDPOINT_LIST_MISSING);
+  }
+
+  const endpointsByProtocol = data.ResourceEndpointList.reduce(
     (
       endpoints: SignalingChannelEndpoints,
       endpoint: ResourceEndpointListItem
@@ -48,7 +57,7 @@ export function useSignalingChannelEndpoints(config: {
   signalingChannelEndpoints: SignalingChannelEndpoints | undefined;
 } {
   const { channelARN, kinesisVideoClient, role } = config;
-  const [error, setError] = useState();
+  const [error, setError] = useState<Error>();
   const [signalingChannelEndpoints, setSignalingChannelEndpoints] = useState<
     SignalingChannelEndpoints
   >();
@@ -58,17 +67,37 @@ export function useSignalingChannelEndpoints(config: {
   }
 
   useEffect(() => {
+    let isCancelled = false;
+
+    const command = new GetSignalingChannelEndpointCommand({
+      ChannelARN: channelARN,
+      SingleMasterChannelEndpointConfiguration: {
+        Protocols: ["WSS", "HTTPS"],
+        Role: role,
+      },
+    });
+
     kinesisVideoClient
-      .getSignalingChannelEndpoint({
-        ChannelARN: channelARN,
-        SingleMasterChannelEndpointConfiguration: {
-          Protocols: ["WSS", "HTTPS"],
-          Role: role,
-        },
-      })
+      .send(command)
       .then(mapSignalingChannelEndpoints)
-      .then(setSignalingChannelEndpoints)
-      .catch(setError);
+      .then((endpoints) => {
+        if (isCancelled) {
+          return;
+        }
+        setSignalingChannelEndpoints(endpoints);
+      })
+      .catch(
+        withErrorLog((error) => {
+          if (isCancelled) {
+            return;
+          }
+          setError(error);
+        })
+      );
+
+    return function cleanup() {
+      isCancelled = true;
+    };
   }, [channelARN, kinesisVideoClient, role]);
 
   return { error, signalingChannelEndpoints };

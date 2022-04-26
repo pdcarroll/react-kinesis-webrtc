@@ -1,49 +1,41 @@
 import { useEffect, useState } from "react";
-import { KinesisVideo } from "@aws-sdk/client-kinesis-video";
-import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
-import type { AWSCredentials } from "../AWSCredentials";
+import { Role, SignalingClient } from "amazon-kinesis-video-streams-webrtc";
+import { SignalingClientConfigOptions } from "../ConfigOptions";
 
 /**
  * @description Creates and opens a signaling channel. Closes connection on cleanup.
  **/
-export function useSignalingClient(config: {
-  channelARN: string;
-  channelEndpoint?: string;
-  clientId?: string;
-  credentials: AWSCredentials;
-  region: string;
-  role: KVSWebRTC.Role;
-  kinesisVideoClient: KinesisVideo;
-}): {
+export function useSignalingClient(
+  config: SignalingClientConfigOptions
+): {
   error: Error | undefined;
-  signalingClient: KVSWebRTC.SignalingClient | undefined;
+  signalingClient: SignalingClient | undefined;
 } {
   const {
     channelARN,
     channelEndpoint,
     credentials: { accessKeyId = "", secretAccessKey = "" } = {},
     clientId,
-    kinesisVideoClient,
     region,
     role,
+    systemClockOffset,
   } = config;
 
-  const [signalingClient, setSignalingClient] = useState<
-    KVSWebRTC.SignalingClient
-  >();
+  const [signalingClient, setSignalingClient] = useState<SignalingClient>();
   const [signalingClientError, setSignalingClientError] = useState<Error>();
-  const { systemClockOffset } = kinesisVideoClient.config;
 
   /** Create signaling client when endpoints are available. */
   useEffect(() => {
     if (!channelEndpoint) {
       return;
     }
-    if (!clientId && role === KVSWebRTC.Role.VIEWER) {
+
+    if (!clientId && role === Role.VIEWER) {
       return;
     }
+
     setSignalingClient(
-      new KVSWebRTC.SignalingClient({
+      new SignalingClient({
         channelARN,
         channelEndpoint,
         clientId,
@@ -66,7 +58,13 @@ export function useSignalingClient(config: {
 
   /** Handle signaling client lifecycle. */
   useEffect(() => {
+    let isCancelled = false;
+
     function handleSignalingClientError(error: Error) {
+      console.error(error);
+      if (isCancelled) {
+        return;
+      }
       setSignalingClientError(error);
     }
 
@@ -74,6 +72,8 @@ export function useSignalingClient(config: {
     signalingClient?.open();
 
     return function cleanup() {
+      isCancelled = true;
+
       signalingClient?.close();
       signalingClient?.off("error", handleSignalingClientError);
     };
