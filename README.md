@@ -206,3 +206,12 @@ Establishes a viewer connection to an existing, active signaling channel.
   peer: Peer // The remote master peer
 }
 ```
+
+## Debugging
+
+To view debug logs, you can pass the `debug` option to `useMaster` or `useViewer`:
+
+```typescript
+useMaster({ ...config, debug: true });
+```
+
