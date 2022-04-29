@@ -1,54 +1,54 @@
-import { useEffect, useRef } from "react";
-import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Role, SignalingClient } from "amazon-kinesis-video-streams-webrtc";
 import { KinesisVideo } from "@aws-sdk/client-kinesis-video";
 import { useIceServers } from "./useIceServers";
 import { useLocalMedia } from "./useLocalMedia";
-import { usePeerState } from "./usePeerState";
+import { usePeerReducer } from "./usePeerReducer";
 import { useSignalingChannelEndpoints } from "./useSignalingChannelEndpoints";
 import { useSignalingClient } from "./useSignalingClient";
-import {
-  ACTION_ADD_PEER_CONNECTION,
-  ACTION_ADD_PEER_MEDIA,
-  ACTION_CLEANUP_PEER,
-  ACTION_REMOVE_PEER_CONNECTION,
-  PEER_STATUS_ACTIVE,
-  PEER_STATUS_INACTIVE,
-  PEER_STATUS_PENDING_MEDIA,
-} from "../constants";
-import type { AWSCredentials } from "../AWSCredentials";
-import type { ConfigOptions } from "../ConfigOptions";
-import type { Peer } from "../Peer";
-import type { PeerState } from "../PeerState";
+import { ConfigOptions, PeerConfigOptions } from "../ConfigOptions";
+import { getLogger } from "../logger";
+import { Peer } from "../Peer";
 
 /**
  * @description Handles peer connections to a master signaling client.
  **/
-function useMasterPeerConnections(config: {
-  channelARN: string;
-  credentials: AWSCredentials;
-  localMedia?: MediaStream;
-  region: string;
-}): { error: Error | undefined; peerEntities: PeerState["entities"] } {
-  const { channelARN, credentials, region } = config;
-  const role = KVSWebRTC.Role.MASTER;
-
-  const kinesisVideoClientRef = useRef<KinesisVideo>(
+function useMasterPeerConnections(
+  config: ConfigOptions & {
+    localMedia: MediaStream | undefined;
+    addPeer: (id: string, peer: Peer) => void;
+    removePeer: (id: string) => void;
+    updatePeer: (id: string, update: Partial<Peer>) => void;
+  }
+): {
+  _signalingClient: SignalingClient | undefined;
+  error: Error | undefined;
+} {
+  const {
+    channelARN,
+    credentials,
+    debug = false,
+    addPeer,
+    removePeer,
+    updatePeer,
+    region,
+  } = config;
+  const logger = useRef(getLogger({ debug }));
+  const role = Role.MASTER;
+  const [sendIceCandidateError, setSendIceCandidateError] = useState<Error>();
+  const kinesisVideoClient = useRef<KinesisVideo>(
     new KinesisVideo({
       region,
       credentials,
     })
   );
 
-  const kinesisVideoClient = kinesisVideoClientRef.current;
-  const [peerState, dispatch] = usePeerState();
-  const { entities: peerStateEntities } = peerState;
-
   const {
     error: signalingChannelEndpointsError,
     signalingChannelEndpoints,
   } = useSignalingChannelEndpoints({
     channelARN,
-    kinesisVideoClient,
+    kinesisVideoClient: kinesisVideoClient.current,
     role,
   });
 
@@ -56,9 +56,9 @@ function useMasterPeerConnections(config: {
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.WSS,
     credentials,
-    kinesisVideoClient,
     region,
     role,
+    systemClockOffset: kinesisVideoClient.current.config.systemClockOffset,
   });
 
   const { error: iceServersError, iceServers } = useIceServers({
@@ -68,113 +68,111 @@ function useMasterPeerConnections(config: {
     region,
   });
 
-  /** Handle peer connections. */
-  useEffect(() => {
-    const peerEntities = Array.from(peerStateEntities.values());
+  // this dict. is used to perform cleanup tasks
+  const peerCleanup = useRef<Record<Peer["id"], () => void>>({});
 
-    if (
-      iceServersError ||
-      signalingChannelEndpointsError ||
-      signalingClientError
-    ) {
-      return cleanup;
+  /**
+   * Handle signaling client events.
+   *
+   * - This effect is designed to be invoked once per master session.
+   * */
+  useEffect(() => {
+    if (!signalingClient || !iceServers) {
+      return;
     }
 
-    for (const { connection, handlers, id, media, status } of peerEntities) {
-      if (status === PEER_STATUS_INACTIVE) {
-        connection?.close();
-        media?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-        dispatch({ type: ACTION_CLEANUP_PEER, payload: { id } });
-        continue;
-      }
-      if (handlers?.iceCandidate) {
-        connection?.addEventListener("icecandidate", handlers.iceCandidate);
-      }
-      if (handlers?.track) {
-        connection?.addEventListener("track", handlers.track);
-      }
-      if (handlers?.iceConnectionStateChange) {
-        connection?.addEventListener(
-          "iceconnectionstatechange",
-          handlers.iceConnectionStateChange
-        );
-      }
+    const externalError =
+      signalingClientError || iceServersError || sendIceCandidateError;
+
+    if (externalError) {
+      logger.current.logMaster(
+        `cleaning up signaling client after error: ${externalError.message}`
+      );
+      return cleanup();
     }
 
     function cleanup() {
-      for (const { connection, handlers } of peerEntities) {
-        if (handlers?.iceCandidate) {
-          connection?.removeEventListener(
-            "icecandidate",
-            handlers.iceCandidate
-          );
-        }
-        if (handlers?.track) {
-          connection?.removeEventListener("track", handlers.track);
-        }
-        if (handlers?.iceConnectionStateChange) {
-          connection?.removeEventListener(
-            "iceconnectionstatechange",
-            handlers.iceConnectionStateChange
-          );
-        }
+      logger.current.logMaster("removing sdp offer listener");
+
+      signalingClient?.off("sdpOffer", handleSdpOffer);
+
+      for (const [id, fn] of Object.entries(peerCleanup.current)) {
+        fn();
+        removePeer(id);
+        delete peerCleanup.current[id];
       }
     }
 
-    return cleanup;
-  }, [
-    dispatch,
-    iceServersError,
-    peerStateEntities,
-    signalingChannelEndpointsError,
-    signalingClientError,
-  ]);
-
-  /** Handle signaling client events. */
-  useEffect(() => {
-    signalingClient?.on("open", handleOpen);
-    signalingClient?.on("sdpOffer", handleSdpOffer);
-
-    function handleOpen() {
-      void 0;
-    }
-
+    /* sdp offer = new peer connection */
     async function handleSdpOffer(offer: RTCSessionDescription, id: string) {
+      logger.current.logMaster("received sdp offer");
+
       const connection = new RTCPeerConnection({
         iceServers,
         iceTransportPolicy: "all",
       });
 
-      const handlers = {
-        iceCandidate: handleIceCandidate,
-        iceConnectionStateChange: handleIceConnectionStateChange,
-        track: handleTrack,
-      };
-
-      dispatch({
-        type: ACTION_ADD_PEER_CONNECTION,
-        payload: { id, connection, handlers },
-      });
+      // this reference is used for cleanup
+      let media: MediaStream;
 
       function handleIceCandidate({ candidate }: RTCPeerConnectionIceEvent) {
+        logger.current.logMaster("received ice candidate");
+
         if (candidate) {
-          signalingClient?.sendIceCandidate(candidate, id);
+          try {
+            signalingClient?.sendIceCandidate(candidate, id);
+          } catch (error) {
+            setSendIceCandidateError(error as Error);
+          }
         }
       }
 
       function handleIceConnectionStateChange() {
-        if (connection.iceConnectionState === "disconnected") {
-          console.log("Disconnected peer, setting to INACTIVE...");
-          dispatch({ type: ACTION_REMOVE_PEER_CONNECTION, payload: { id } });
+        logger.current.logMaster(
+          `ice connection state change: ${connection.iceConnectionState}`
+        );
+
+        if (
+          ["closed", "disconnected", "failed"].includes(
+            connection.iceConnectionState
+          )
+        ) {
+          removePeer(id);
+          peerCleanup.current[id]?.();
+          delete peerCleanup.current[id];
         }
       }
 
       function handleTrack({ streams = [] }: RTCTrackEvent) {
-        dispatch({
-          type: ACTION_ADD_PEER_MEDIA,
-          payload: { id, media: streams[0] },
-        });
+        logger.current.logMaster("received peer track");
+
+        media = streams[0];
+        updatePeer(id, { media });
       }
+
+      connection.addEventListener("icecandidate", handleIceCandidate);
+      connection.addEventListener("track", handleTrack);
+      connection.addEventListener(
+        "iceconnectionstatechange",
+        handleIceConnectionStateChange
+      );
+
+      addPeer(id, { id, connection });
+      peerCleanup.current[id] = () => {
+        logger.current.logMaster(`cleaning up peer ${id}`);
+
+        media?.getTracks().forEach((track: MediaStreamTrack) => {
+          track.stop();
+        });
+
+        connection.close();
+        connection.removeEventListener("icecandidate", handleIceCandidate);
+        connection.removeEventListener("track", handleTrack);
+        connection.removeEventListener(
+          "iceconnectionstatechange",
+          handleIceConnectionStateChange
+        );
+      };
 
       await connection.setRemoteDescription(offer);
       await connection.setLocalDescription(
@@ -184,21 +182,36 @@ function useMasterPeerConnections(config: {
         })
       );
 
-      if (connection.localDescription) {
-        signalingClient?.sendSdpAnswer(connection.localDescription, id);
-      }
+      signalingClient?.sendSdpAnswer(
+        connection.localDescription as RTCSessionDescription,
+        id
+      );
     }
 
-    return function cleanup() {
-      signalingClient?.off("open", handleOpen);
-      signalingClient?.off("sdpOffer", handleSdpOffer);
-    };
-  }, [dispatch, iceServers, signalingClient]);
+    logger.current.logMaster("adding sdp offer listener");
+    signalingClient.on("sdpOffer", handleSdpOffer);
+
+    return cleanup;
+  }, [
+    addPeer,
+    iceServers,
+    iceServersError,
+    logger,
+    peerCleanup,
+    removePeer,
+    sendIceCandidateError,
+    signalingClient,
+    signalingClientError,
+    updatePeer,
+  ]);
 
   return {
+    _signalingClient: signalingClient,
     error:
-      signalingChannelEndpointsError || signalingClientError || iceServersError,
-    peerEntities: peerState.entities,
+      signalingChannelEndpointsError ||
+      signalingClientError ||
+      iceServersError ||
+      sendIceCandidateError,
   };
 }
 
@@ -206,8 +219,9 @@ function useMasterPeerConnections(config: {
  * @description Opens a master connection using an existing signaling channel.
  **/
 export function useMaster(
-  config: ConfigOptions
+  config: PeerConfigOptions
 ): {
+  _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
   localMedia: MediaStream | undefined;
   peers: Array<Peer>;
@@ -215,36 +229,69 @@ export function useMaster(
   const {
     channelARN,
     credentials,
+    debug = false,
     region,
     media = { audio: true, video: true },
   } = config;
+  const logger = getLogger({ debug });
   const { error: mediaError, media: localMedia } = useLocalMedia(media);
-  const {
-    error: peerConnectionsError,
-    peerEntities,
-  } = useMasterPeerConnections({
-    channelARN,
-    credentials,
-    localMedia,
-    region,
-  });
+  const [peers, dispatch] = usePeerReducer({});
 
-  /** Send local media stream to remote peers. */
+  /* Handle peer side effects */
   useEffect(() => {
-    for (const { connection, status } of Array.from(peerEntities.values())) {
-      if (status === PEER_STATUS_PENDING_MEDIA) {
+    if (!localMedia) {
+      return;
+    }
+
+    for (const peer of Object.values(peers)) {
+      if (peer.isWaitingForMedia) {
         localMedia?.getTracks().forEach((track: MediaStreamTrack) => {
-          connection?.addTrack(track, localMedia);
+          peer.connection?.addTrack(track, localMedia);
+        });
+        return dispatch({
+          type: "update",
+          payload: { id: peer.id, isWaitingForMedia: false },
         });
       }
     }
-  }, [peerEntities, localMedia]);
+  }, [dispatch, localMedia, peers]);
+
+  logger.logMaster({ peers });
+
+  const {
+    _signalingClient,
+    error: peerConnectionsError,
+  } = useMasterPeerConnections({
+    channelARN,
+    credentials,
+    debug,
+    localMedia,
+    region,
+    addPeer: useCallback(
+      (id, peer) => {
+        dispatch({
+          type: "add",
+          payload: { ...peer, isWaitingForMedia: true },
+        });
+      },
+      [dispatch]
+    ),
+    removePeer: useCallback(
+      (id) => {
+        dispatch({ type: "remove", payload: { id } });
+      },
+      [dispatch]
+    ),
+    updatePeer: useCallback(
+      (id, update) => dispatch({ type: "update", payload: { id, ...update } }),
+      [dispatch]
+    ),
+  });
 
   return {
+    _signalingClient,
     error: mediaError || peerConnectionsError,
     localMedia,
-    peers: Array.from(peerEntities.values()).filter(
-      ({ status }) => status === PEER_STATUS_ACTIVE
-    ),
+    peers: Object.values(peers),
   };
 }

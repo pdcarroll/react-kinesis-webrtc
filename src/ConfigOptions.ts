@@ -1,3 +1,4 @@
+import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
 import type { AWSCredentials } from "./AWSCredentials";
 
 type MediaConfig = {
@@ -5,10 +6,20 @@ type MediaConfig = {
   video?: boolean | MediaTrackConstraints;
 };
 
-export interface ConfigOptions
-  extends Record<string, string | AWSCredentials | MediaConfig> {
+export interface ConfigOptions {
   channelARN: string;
   credentials: AWSCredentials;
-  media: MediaConfig;
+  debug?: boolean;
   region: string;
+}
+
+export interface PeerConfigOptions extends ConfigOptions {
+  media: MediaConfig;
+}
+
+export interface SignalingClientConfigOptions extends ConfigOptions {
+  channelEndpoint: string | undefined;
+  clientId?: string;
+  role: KVSWebRTC.Role;
+  systemClockOffset: number;
 }
