@@ -1,0 +1,6 @@
+{
+    "channelARN": "string",
+    "channelEndpoint": "wss://testendpoint",
+    "credentials": { "accessKeyId": "string", "secretAccessKey": "string" },
+    "region": "string"
+}

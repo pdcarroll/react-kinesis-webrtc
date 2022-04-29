@@ -1,0 +1,13 @@
+{
+    "$metadata": {},
+    "ResourceEndpointList": [
+      {
+        "Protocol": "WSS",
+        "ResourceEndpoint": "wss://test"
+      },
+      {
+        "Protocol": "HTTPS",
+        "ResourceEndpoint": "https://test"
+      }
+    ]
+  }
