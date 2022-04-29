@@ -185,12 +185,13 @@ Establishes a viewer connection to an existing, active signaling channel.
 ```typescript
 {
   credentials: {
-    accessKeyId: string; // AWS access key ID
-    secretAccessKey: string; // AWS secret access key
+    accessKeyId: string;      // AWS access key ID
+    secretAccessKey: string;  // AWS secret access key
   },
-  channelARN: string; // An active master AWS signaling channel ARN
-  region: string; // The AWS region of the channel ARN
-  media: { // Media options
+  channelARN: string;         // An active master AWS signaling channel ARN
+  debug: boolean;             // Output debugging logs to console
+  region: string;             // The AWS region of the channel ARN
+  media: {                    // Media options
     audio: boolean;
     video: boolean | MediaTrackConstraints;
   }
@@ -205,14 +206,6 @@ Establishes a viewer connection to an existing, active signaling channel.
   localMedia: MediaStream | undefined // Your local media stream
   peer: Peer // The remote master peer
 }
-```
-
-## Debugging
-
-To view debug logs, you can pass the `debug` option to `useMaster` or `useViewer`:
-
-```typescript
-useMaster({ ...config, debug: true });
 ```
 
 ## Testing
