@@ -6,8 +6,8 @@
   "module": "dist/index.esm.js",
   "scripts": {
     "build": "rm -rf dist && rollup -c",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "release": "npm run build && npm publish"
+    "test": "jest",
+    "release": "npm run test && npm run build && npm publish"
   },
   "author": "Patrick Carroll <pcarroll.design@gmail.com>",
   "license": "ISC",
@@ -25,17 +25,25 @@
     "@rollup/plugin-commonjs": "^15.1.0",
     "@rollup/plugin-node-resolve": "^9.0.0",
     "@rollup/plugin-typescript": "^6.0.0",
+    "@testing-library/react-hooks": "^8.0.0",
+    "@types/jest": "^27.4.1",
     "@types/node": "^14.10.1",
     "@types/react": "^16.9.49",
     "@types/uuid": "^8.3.0",
     "@typescript-eslint/eslint-plugin": "^4.2.0",
     "@typescript-eslint/parser": "^4.2.0",
+    "aws-sdk-client-mock": "^0.6.2",
     "eslint": "^7.9.0",
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-prettier": "^3.3.1",
     "eslint-plugin-react-hooks": "^4.1.2",
+    "jest": "^27.5.1",
     "prettier": "^2.1.2",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "react-test-renderer": "^17.0.2",
     "rollup": "^2.29.0",
+    "ts-jest": "^27.1.4",
     "ts-loader": "^8.0.4",
     "tslib": "^2.0.3",
     "tslint": "^6.1.3",
@@ -43,7 +51,7 @@
     "typescript": "^4.0.2"
   },
   "peerDependencies": {
-    "react": "^16.18.0"
+    "react": "^17.0.2"
   },
   "dependencies": {
     "@aws-sdk/client-kinesis-video": "^3.6.0",

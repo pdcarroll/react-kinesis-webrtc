@@ -215,3 +215,10 @@ To view debug logs, you can pass the `debug` option to `useMaster` or `useViewer
 useMaster({ ...config, debug: true });
 ```
 
+## Testing
+
+Tests use [Jest](https://jestjs.io/) and [react-hooks-testing-library](https://github.com/testing-library/react-hooks-testing-library).
+
+```shell
+$ npm run test
+```
