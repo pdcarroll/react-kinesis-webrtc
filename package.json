@@ -1,6 +1,6 @@
 {
   "name": "react-kinesis-webrtc",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "An experimental library of React hooks for the AWS Kinesis WebRTC JavaScript SDK.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
