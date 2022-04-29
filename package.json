@@ -6,6 +6,7 @@
   "module": "dist/index.esm.js",
   "scripts": {
     "build": "rm -rf dist && rollup -c",
+    "pack": "npm run build && npm pack --pack-destination=package",
     "test": "jest",
     "release": "npm run test && npm run build && npm publish"
   },
@@ -58,5 +59,8 @@
     "@aws-sdk/client-kinesis-video-signaling": "^3.6.0",
     "amazon-kinesis-video-streams-webrtc": "^1.0.8",
     "uuid": "^8.3.0"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }
