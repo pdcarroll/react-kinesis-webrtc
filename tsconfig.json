@@ -8,8 +8,9 @@
         "name": "typescript-tslint-plugin"
       }
     ],
+    "resolveJsonModule": true,
     "sourceMap": true,
     "strict": true
   },
-  "include": ["src"]
+  "include": ["src", "__test__"]
 }
