@@ -1,0 +1,10 @@
+{
+    "$metadata": {},
+    "IceServerList": [
+      {
+        "Uris": ["https://test"],
+        "Username": "test",
+        "Password": "pass"
+      }
+    ]
+  }
