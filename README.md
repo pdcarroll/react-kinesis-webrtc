@@ -192,7 +192,7 @@ Establishes a viewer connection to an existing, active signaling channel.
   channelARN: string;         // An active master AWS signaling channel ARN
   debug?: boolean;            // (optional) Output debugging logs to console
   region: string;             // The AWS region of the channel ARN
-  media: {                    // Local media stream options
+  media?: {                   // (optional) Local media stream options - if omitted, establishes a one-way peer connection
     audio: boolean;
     video: boolean | MediaTrackConstraints;
   }
@@ -208,6 +208,10 @@ Establishes a viewer connection to an existing, active signaling channel.
   peer: Peer                            // The remote master peer
 }
 ```
+
+#### Viewer-Only Mode
+
+To create a viewer that establishes a one-way media connection with a remote peer(s), you can omit the `media` argument from the `config` object. The viewer will not attempt to access the local user's camera or microphone.
 
 ## Testing
 

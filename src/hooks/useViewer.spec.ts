@@ -171,3 +171,21 @@ test("sends local media stream to peer when it is ready", async () => {
   await waitForNextUpdate();
   expect(result.current.peer?.connection?.addTrack).toHaveBeenCalledTimes(1);
 });
+
+test("does not access local media when media is omitted from config options", async () => {
+  const getUserMedia = mockGetUserMedia();
+  mockMediaDevices({ getUserMedia });
+  const { waitForNextUpdate } = renderHook(() =>
+    useViewer({ ...mockViewerConfig, media: undefined })
+  );
+  await waitForNextUpdate();
+  expect(getUserMedia).toHaveBeenCalledTimes(0);
+});
+
+test("does not send local media to peer when media is omitted from config options", async () => {
+  const { result, waitForNextUpdate } = renderHook(() =>
+    useViewer({ ...mockViewerConfig, media: undefined })
+  );
+  await waitForNextUpdate();
+  expect(result.current.peer?.connection?.addTrack).toHaveBeenCalledTimes(0);
+});
