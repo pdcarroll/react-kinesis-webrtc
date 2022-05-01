@@ -244,7 +244,7 @@ export function useMaster(config: PeerConfigOptions): {
         localMedia?.getTracks().forEach((track: MediaStreamTrack) => {
           peer.connection?.addTrack(track, localMedia);
         });
-        return dispatch({
+        dispatch({
           type: "update",
           payload: { id: peer.id, isWaitingForMedia: false },
         });
