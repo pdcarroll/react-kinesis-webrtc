@@ -177,7 +177,9 @@ Establishes a master connection using an existing signaling channel. Manages pee
 
 ### useViewer
 
-Establishes a viewer connection to an existing, active signaling channel.
+Establishes a viewer connection to an existing, active signaling channel. The default is a two-way connection between the client and peer.
+
+To create a **one-way** connection with a remote peer, omit the `media` argument from the `config` object. In this case, the client's local media devices are not accessed.
 
 #### Params
 
@@ -208,10 +210,6 @@ Establishes a viewer connection to an existing, active signaling channel.
   peer: Peer                            // The remote master peer
 }
 ```
-
-#### Viewer-Only Mode
-
-To create a viewer that establishes a one-way media connection with a remote peer(s), you can omit the `media` argument from the `config` object. The viewer will not attempt to access the local user's camera or microphone.
 
 ## Testing
 
