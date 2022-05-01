@@ -5,6 +5,7 @@ export function mockSignalingClient({
   close = () => null,
   sendIceCandidate = () => null,
   sendSdpAnswer = () => null,
+  sendSdpOffer = () => null,
 } = {}): void {
   jest.spyOn(SignalingClient.prototype, "open").mockImplementation(open);
   jest.spyOn(SignalingClient.prototype, "close").mockImplementation(close);
@@ -14,4 +15,7 @@ export function mockSignalingClient({
   jest
     .spyOn(SignalingClient.prototype, "sendSdpAnswer")
     .mockImplementation(sendSdpAnswer);
+  jest
+    .spyOn(SignalingClient.prototype, "sendSdpOffer")
+    .mockImplementation(sendSdpOffer);
 }

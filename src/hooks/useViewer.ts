@@ -43,6 +43,7 @@ function useViewerPeerConnection(
   const kinesisVideoClient = kinesisVideoClientRef.current;
   const [peerConnection, setPeerConnection] = useState<RTCPeerConnection>();
   const [peerMedia, setPeerMedia] = useState<MediaStream>();
+  const [peerError, setPeerError] = useState<Error>();
 
   const {
     error: signalingChannelEndpointsError,
@@ -103,10 +104,17 @@ function useViewerPeerConnection(
         offerToReceiveVideo: true,
       });
 
-      await peerConnection?.setLocalDescription(sessionDescription);
+      try {
+        await peerConnection?.setLocalDescription(sessionDescription);
+      } catch (error) {
+        console.error(error);
+        return setPeerError(error as Error);
+      }
 
       if (!peerConnection?.localDescription) {
-        throw new Error(ERROR_PEER_CONNECTION_LOCAL_DESCRIPTION_REQUIRED);
+        return setPeerError(
+          new Error(ERROR_PEER_CONNECTION_LOCAL_DESCRIPTION_REQUIRED)
+        );
       }
 
       logger.current.logViewer(`[${clientId.current}] sending sdp offer`);
@@ -193,7 +201,10 @@ function useViewerPeerConnection(
   return {
     _signalingClient: signalingClient,
     error:
-      signalingChannelEndpointsError || iceServersError || signalingClientError,
+      signalingChannelEndpointsError ||
+      iceServersError ||
+      signalingClientError ||
+      peerError,
     peer: {
       id: clientId.current,
       connection: peerConnection,
