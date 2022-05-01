@@ -142,14 +142,15 @@ Establishes a master connection using an existing signaling channel. Manages pee
 ```typescript
 {
   credentials: {
-    accessKeyId: string; // AWS access key ID
-    secretAccessKey: string; // AWS secret access key
+    accessKeyId: string;                      // AWS access key ID
+    secretAccessKey: string;                  // AWS secret access key
   },
-  channelARN: string; // An active AWS signaling channel ARN
-  region: "" // The AWS region of the channel ARN
-  media: {
-    audio: boolean; // stream audio
-    video: boolean | MediaStreamConstraints; // stream video or video options
+  channelARN: string;                         // An active AWS signaling channel ARN
+  debug?: boolean;                            // (optional) Output debugging logs to console
+  region: string;                             // The AWS region of the channel ARN
+  media: {                                    // Local media stream options
+    audio: boolean;
+    video: boolean | MediaStreamConstraints;
   }
 }
 ```
@@ -158,9 +159,9 @@ Establishes a master connection using an existing signaling channel. Manages pee
 
 ```typescript
 {
-  error: Error | undefined,
-  localMedia: MediaStream | undefined, // Your local media stream
-  peers: Array<Peer> // Remote viewer peer media streams
+  error: Error | undefined,             // Error
+  localMedia: MediaStream | undefined,  // Your local media stream
+  peers: Array<Peer>                    // Remote viewer peer media streams
 }
 ```
 
@@ -189,9 +190,9 @@ Establishes a viewer connection to an existing, active signaling channel.
     secretAccessKey: string;  // AWS secret access key
   },
   channelARN: string;         // An active master AWS signaling channel ARN
-  debug: boolean;             // Output debugging logs to console
+  debug?: boolean;            // (optional) Output debugging logs to console
   region: string;             // The AWS region of the channel ARN
-  media: {                    // Media options
+  media: {                    // Local media stream options
     audio: boolean;
     video: boolean | MediaTrackConstraints;
   }
@@ -202,9 +203,9 @@ Establishes a viewer connection to an existing, active signaling channel.
 
 ```typescript
 {
-  error: Error | undefined,
-  localMedia: MediaStream | undefined // Your local media stream
-  peer: Peer // The remote master peer
+  error: Error | undefined,             // Error
+  localMedia: MediaStream | undefined   // Your local media stream
+  peer: Peer                            // The remote master peer
 }
 ```
 
