@@ -20,13 +20,15 @@ import { getLogger } from "../logger";
  * @description Handles peer connection to a viewer signaling client.
  **/
 function useViewerPeerConnection(
-  config: ConfigOptions
+  config: ConfigOptions & {
+    viewerOnly?: boolean;
+  }
 ): {
   _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
   peer: Peer;
 } {
-  const { channelARN, credentials, debug = false, region } = config;
+  const { channelARN, credentials, debug = false, region, viewerOnly } = config;
   const logger = useRef(getLogger({ debug }));
   const role = Role.VIEWER;
   const clientId = useRef<string>(uuid());
@@ -88,6 +90,13 @@ function useViewerPeerConnection(
 
     async function handleOpen() {
       logger.current.logViewer(`[${clientId.current}] signaling client opened`);
+
+      if (viewerOnly) {
+        peerConnection?.addTransceiver("video");
+        peerConnection
+          ?.getTransceivers()
+          .forEach((t) => (t.direction = "recvonly"));
+      }
 
       const sessionDescription = await peerConnection?.createOffer({
         offerToReceiveAudio: true,
@@ -172,7 +181,7 @@ function useViewerPeerConnection(
       peerConnection?.removeEventListener("track", handlePeerTrack);
       peerConnection?.close();
     };
-  }, [clientId, logger, peerConnection, signalingClient]);
+  }, [clientId, logger, peerConnection, signalingClient, viewerOnly]);
 
   /** Handle peer media lifecycle. */
   useEffect(() => {
@@ -197,21 +206,19 @@ function useViewerPeerConnection(
  * @description Opens a viewer connection to an active master signaling channel.
  **/
 export function useViewer(
-  config: PeerConfigOptions
+  config: Omit<PeerConfigOptions, "media"> & {
+    media?: PeerConfigOptions["media"];
+  }
 ): {
   _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
   localMedia: MediaStream | undefined;
   peer: Peer | undefined;
 } {
-  const {
-    channelARN,
-    credentials,
-    debug,
-    region,
-    media = { audio: true, video: true },
-  } = config;
-  const { error: streamError, media: localMedia } = useLocalMedia(media);
+  const { channelARN, credentials, debug, region, media } = config;
+  const { error: streamError, media: localMedia } = useLocalMedia(
+    media || { audio: false, video: false }
+  );
   const {
     _signalingClient,
     error: peerConnectionError,
@@ -221,6 +228,7 @@ export function useViewer(
     credentials,
     debug,
     region,
+    viewerOnly: !Boolean(media),
   });
 
   /** Send local media stream to remote peer. */

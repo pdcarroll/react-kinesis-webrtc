@@ -5,8 +5,8 @@ import { withErrorLog } from "../withErrorLog";
  * @description Opens and returns local media stream. Closes stream on cleanup.
  **/
 export function useLocalMedia({
-  audio = true,
-  video = true,
+  audio,
+  video,
 }: {
   audio?: boolean;
   video?: boolean | MediaTrackConstraints;
@@ -15,6 +15,10 @@ export function useLocalMedia({
   const [error, setError] = useState<Error>();
 
   useEffect(() => {
+    if (!video && !audio) {
+      return;
+    }
+
     let _media: MediaStream;
     let isCancelled = false;
 

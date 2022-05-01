@@ -57,3 +57,10 @@ test("cancels media stream on cleanup", async () => {
   await cleanup();
   expect(result.current.media).toBeUndefined();
 });
+
+test("does not access local media when media config options are not set", () => {
+  const getUserMedia = mockGetUserMedia();
+  mockMediaDevices({ getUserMedia });
+  renderHook(() => useLocalMedia({ audio: false, video: false }));
+  expect(getUserMedia).toHaveBeenCalledTimes(0);
+});
