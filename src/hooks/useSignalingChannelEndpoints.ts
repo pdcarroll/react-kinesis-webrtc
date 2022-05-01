@@ -58,9 +58,8 @@ export function useSignalingChannelEndpoints(config: {
 } {
   const { channelARN, kinesisVideoClient, role } = config;
   const [error, setError] = useState<Error>();
-  const [signalingChannelEndpoints, setSignalingChannelEndpoints] = useState<
-    SignalingChannelEndpoints
-  >();
+  const [signalingChannelEndpoints, setSignalingChannelEndpoints] =
+    useState<SignalingChannelEndpoints>();
 
   if (!channelARN) {
     throw new Error(ERROR_CHANNEL_ARN_MISSING);
