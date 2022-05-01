@@ -36,6 +36,12 @@ let getSignalingChannelEndpointsMock: AwsStub<
   GetSignalingChannelEndpointCommandOutput
 >;
 
+function mockSignalingClientOpen(signalingClient: SignalingClient) {
+  act(() => {
+    signalingClient.emit("open", new Error());
+  });
+}
+
 beforeEach(() => {
   mockMediaDevices();
   mockRTCPeerConnection();
@@ -151,6 +157,24 @@ test("returns a signaling client error", async () => {
     result.current._signalingClient?.emit("error", signalingClientError);
   });
   expect(result.current.error).toBe(signalingClientError);
+});
+
+test("returns a peer error", async () => {
+  const peerError = new Error();
+  mockRTCPeerConnection({
+    RTCPeerConnection: {
+      setLocalDescription: {
+        error: peerError,
+      },
+    },
+  });
+  const { result, waitForNextUpdate } = renderHook(() =>
+    useViewer(mockViewerConfig)
+  );
+  await waitForNextUpdate();
+  mockSignalingClientOpen(result.current._signalingClient as SignalingClient);
+  await waitForNextUpdate();
+  expect(result.current.error).toBe(peerError);
 });
 
 test("sends local media stream to peer when it is ready", async () => {
