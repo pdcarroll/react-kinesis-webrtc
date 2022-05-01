@@ -43,14 +43,12 @@ function useMasterPeerConnections(
     })
   );
 
-  const {
-    error: signalingChannelEndpointsError,
-    signalingChannelEndpoints,
-  } = useSignalingChannelEndpoints({
-    channelARN,
-    kinesisVideoClient: kinesisVideoClient.current,
-    role,
-  });
+  const { error: signalingChannelEndpointsError, signalingChannelEndpoints } =
+    useSignalingChannelEndpoints({
+      channelARN,
+      kinesisVideoClient: kinesisVideoClient.current,
+      role,
+    });
 
   const { error: signalingClientError, signalingClient } = useSignalingClient({
     channelARN,
@@ -218,9 +216,7 @@ function useMasterPeerConnections(
 /**
  * @description Opens a master connection using an existing signaling channel.
  **/
-export function useMaster(
-  config: PeerConfigOptions
-): {
+export function useMaster(config: PeerConfigOptions): {
   _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
   localMedia: MediaStream | undefined;
@@ -258,35 +254,34 @@ export function useMaster(
 
   logger.logMaster({ peers });
 
-  const {
-    _signalingClient,
-    error: peerConnectionsError,
-  } = useMasterPeerConnections({
-    channelARN,
-    credentials,
-    debug,
-    localMedia,
-    region,
-    addPeer: useCallback(
-      (id, peer) => {
-        dispatch({
-          type: "add",
-          payload: { ...peer, isWaitingForMedia: true },
-        });
-      },
-      [dispatch]
-    ),
-    removePeer: useCallback(
-      (id) => {
-        dispatch({ type: "remove", payload: { id } });
-      },
-      [dispatch]
-    ),
-    updatePeer: useCallback(
-      (id, update) => dispatch({ type: "update", payload: { id, ...update } }),
-      [dispatch]
-    ),
-  });
+  const { _signalingClient, error: peerConnectionsError } =
+    useMasterPeerConnections({
+      channelARN,
+      credentials,
+      debug,
+      localMedia,
+      region,
+      addPeer: useCallback(
+        (id, peer) => {
+          dispatch({
+            type: "add",
+            payload: { ...peer, isWaitingForMedia: true },
+          });
+        },
+        [dispatch]
+      ),
+      removePeer: useCallback(
+        (id) => {
+          dispatch({ type: "remove", payload: { id } });
+        },
+        [dispatch]
+      ),
+      updatePeer: useCallback(
+        (id, update) =>
+          dispatch({ type: "update", payload: { id, ...update } }),
+        [dispatch]
+      ),
+    });
 
   return {
     _signalingClient,

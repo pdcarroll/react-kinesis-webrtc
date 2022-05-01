@@ -45,14 +45,12 @@ function useViewerPeerConnection(
   const [peerMedia, setPeerMedia] = useState<MediaStream>();
   const [peerError, setPeerError] = useState<Error>();
 
-  const {
-    error: signalingChannelEndpointsError,
-    signalingChannelEndpoints,
-  } = useSignalingChannelEndpoints({
-    channelARN,
-    kinesisVideoClient,
-    role,
-  });
+  const { error: signalingChannelEndpointsError, signalingChannelEndpoints } =
+    useSignalingChannelEndpoints({
+      channelARN,
+      kinesisVideoClient,
+      role,
+    });
 
   const { error: iceServersError, iceServers } = useIceServers({
     channelARN,

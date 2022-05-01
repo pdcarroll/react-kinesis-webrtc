@@ -5,9 +5,7 @@ import { SignalingClientConfigOptions } from "../ConfigOptions";
 /**
  * @description Creates and opens a signaling channel. Closes connection on cleanup.
  **/
-export function useSignalingClient(
-  config: SignalingClientConfigOptions
-): {
+export function useSignalingClient(config: SignalingClientConfigOptions): {
   error: Error | undefined;
   signalingClient: SignalingClient | undefined;
 } {
