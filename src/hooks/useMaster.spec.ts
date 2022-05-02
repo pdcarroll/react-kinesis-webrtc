@@ -212,7 +212,7 @@ test("removes peers when there is a signaling client error", async () => {
   expect(result.current.peers).toHaveLength(0);
 });
 
-test("sends media to peer when it is ready", async () => {
+test("does not open the signaling client until the local media stream is created", async () => {
   mockMediaDevices({
     getUserMedia: jest.fn(
       () =>
@@ -227,10 +227,5 @@ test("sends media to peer when it is ready", async () => {
     useMaster(masterConfig)
   );
   await waitForNextUpdate();
-  mockNewPeerConnection(result.current._signalingClient as SignalingClient);
-  expect(result.current.peers[0].connection?.addTrack).toHaveBeenCalledTimes(0);
-  expect(result.current.peers[0].isWaitingForMedia).toEqual(true);
-  await waitForNextUpdate();
-  expect(result.current.peers[0].connection?.addTrack).toHaveBeenCalledTimes(1);
-  expect(result.current.peers[0].isWaitingForMedia).toEqual(false);
+  expect(result.current._signalingClient?.open).toHaveBeenCalledTimes(0);
 });

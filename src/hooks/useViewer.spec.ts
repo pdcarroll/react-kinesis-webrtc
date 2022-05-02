@@ -177,7 +177,7 @@ test("returns a peer error", async () => {
   expect(result.current.error).toBe(peerError);
 });
 
-test("sends local media stream to peer when it is ready", async () => {
+test("does not initialize the peer connection until local media is created", async () => {
   mockMediaDevices({
     getUserMedia: jest.fn(
       () =>
@@ -192,24 +192,16 @@ test("sends local media stream to peer when it is ready", async () => {
     useViewer(mockViewerConfig)
   );
   await waitForNextUpdate();
-  await waitForNextUpdate();
-  expect(result.current.peer?.connection?.addTrack).toHaveBeenCalledTimes(1);
+  expect(result.current.peer?.connection).toBeUndefined();
 });
 
-test("does not access local media when media is omitted from config options", async () => {
+test("does not initialize local media when media is omitted from config options", async () => {
   const getUserMedia = mockGetUserMedia();
   mockMediaDevices({ getUserMedia });
-  const { waitForNextUpdate } = renderHook(() =>
-    useViewer({ ...mockViewerConfig, media: undefined })
-  );
-  await waitForNextUpdate();
-  expect(getUserMedia).toHaveBeenCalledTimes(0);
-});
-
-test("does not send local media to peer when media is omitted from config options", async () => {
   const { result, waitForNextUpdate } = renderHook(() =>
     useViewer({ ...mockViewerConfig, media: undefined })
   );
   await waitForNextUpdate();
-  expect(result.current.peer?.connection?.addTrack).toHaveBeenCalledTimes(0);
+  expect(result.current.localMedia).toBeUndefined();
+  expect(getUserMedia).toHaveBeenCalledTimes(0);
 });
