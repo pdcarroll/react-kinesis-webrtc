@@ -3,7 +3,7 @@ import { Role, SignalingClient } from "amazon-kinesis-video-streams-webrtc";
 import { SignalingClientConfigOptions } from "../ConfigOptions";
 
 /**
- * @description Creates and opens a signaling channel. Closes connection on cleanup.
+ * @description Creates a signaling channel.
  **/
 export function useSignalingClient(config: SignalingClientConfigOptions): {
   error: Error | undefined;
@@ -60,6 +60,7 @@ export function useSignalingClient(config: SignalingClientConfigOptions): {
 
     function handleSignalingClientError(error: Error) {
       console.error(error);
+
       if (isCancelled) {
         return;
       }
@@ -67,12 +68,10 @@ export function useSignalingClient(config: SignalingClientConfigOptions): {
     }
 
     signalingClient?.on("error", handleSignalingClientError);
-    signalingClient?.open();
 
     return function cleanup() {
       isCancelled = true;
 
-      signalingClient?.close();
       signalingClient?.off("error", handleSignalingClientError);
     };
   }, [signalingClient]);

@@ -15,7 +15,7 @@ import { Peer } from "../Peer";
  **/
 function useMasterPeerConnections(
   config: ConfigOptions & {
-    localMedia: MediaStream | undefined;
+    localMediaIsActive: boolean;
     addPeer: (id: string, peer: Peer) => void;
     removePeer: (id: string) => void;
     updatePeer: (id: string, update: Partial<Peer>) => void;
@@ -28,6 +28,7 @@ function useMasterPeerConnections(
     channelARN,
     credentials,
     debug = false,
+    localMediaIsActive,
     addPeer,
     removePeer,
     updatePeer,
@@ -75,7 +76,7 @@ function useMasterPeerConnections(
    * - This effect is designed to be invoked once per master session.
    * */
   useEffect(() => {
-    if (!signalingClient || !iceServers) {
+    if (!signalingClient || !iceServers || !localMediaIsActive) {
       return;
     }
 
@@ -93,6 +94,7 @@ function useMasterPeerConnections(
       logger.current.logMaster("cleaning up peer connections");
 
       signalingClient?.off("sdpOffer", handleSdpOffer);
+      signalingClient?.close();
 
       for (const [id, fn] of Object.entries(peerCleanup.current)) {
         fn();
@@ -187,12 +189,14 @@ function useMasterPeerConnections(
     }
 
     signalingClient.on("sdpOffer", handleSdpOffer);
+    signalingClient.open();
 
     return cleanup;
   }, [
     addPeer,
     iceServers,
     iceServersError,
+    localMediaIsActive,
     logger,
     peerCleanup,
     removePeer,
@@ -257,8 +261,8 @@ export function useMaster(config: PeerConfigOptions): {
       channelARN,
       credentials,
       debug,
-      localMedia,
       region,
+      localMediaIsActive: Boolean(localMedia),
       addPeer: useCallback(
         (id, peer) => {
           dispatch({

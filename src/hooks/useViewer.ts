@@ -21,6 +21,7 @@ import { getLogger } from "../logger";
  **/
 function useViewerPeerConnection(
   config: ConfigOptions & {
+    localMediaIsActive: boolean;
     viewerOnly?: boolean;
   }
 ): {
@@ -28,7 +29,14 @@ function useViewerPeerConnection(
   error: Error | undefined;
   peer: Peer;
 } {
-  const { channelARN, credentials, debug = false, region, viewerOnly } = config;
+  const {
+    channelARN,
+    credentials,
+    debug = false,
+    localMediaIsActive,
+    region,
+    viewerOnly,
+  } = config;
   const logger = useRef(getLogger({ debug }));
   const role = Role.VIEWER;
   const clientId = useRef<string>(uuid());
@@ -71,23 +79,31 @@ function useViewerPeerConnection(
 
   /** Initialize the peer connection with ice servers. */
   useEffect(() => {
-    if (iceServers) {
-      setPeerConnection(
-        new RTCPeerConnection({
-          iceServers,
-          iceTransportPolicy: "all",
-        })
-      );
-    }
-  }, [iceServers]);
-
-  /** Handle signaling client and remote peer lifecycle. */
-  useEffect(() => {
-    if (!peerConnection) {
+    if (!iceServers) {
       return;
     }
 
-    async function handleOpen() {
+    // in order to prevent certain race conditions, ensure the local media stream is active
+    // before initializing the peer connection (one-way viewers are exempt)
+    if (!viewerOnly && !localMediaIsActive) {
+      return;
+    }
+
+    setPeerConnection(
+      new RTCPeerConnection({
+        iceServers,
+        iceTransportPolicy: "all",
+      })
+    );
+  }, [localMediaIsActive, iceServers, viewerOnly]);
+
+  /** Handle signaling client and remote peer lifecycle. */
+  useEffect(() => {
+    if (!peerConnection || !signalingClient) {
+      return;
+    }
+
+    async function handleSignalingClientOpen() {
       logger.current.logViewer(`[${clientId.current}] signaling client opened`);
 
       if (viewerOnly) {
@@ -120,7 +136,9 @@ function useViewerPeerConnection(
       signalingClient?.sendSdpOffer(peerConnection.localDescription);
     }
 
-    async function handleSdpAnswer(answer: RTCSessionDescriptionInit) {
+    async function handleSignalingClientSdpAnswer(
+      answer: RTCSessionDescriptionInit
+    ) {
       logger.current.logViewer(`[${clientId.current}] received sdp answer`);
 
       if (!peerConnection) {
@@ -166,28 +184,37 @@ function useViewerPeerConnection(
       setPeerMedia(streams[0]);
     }
 
-    signalingClient?.on("open", handleOpen);
-    signalingClient?.on("sdpAnswer", handleSdpAnswer);
-    signalingClient?.on("iceCandidate", handleSignalingChannelIceCandidate);
+    signalingClient.on("open", handleSignalingClientOpen);
+    signalingClient.on("sdpAnswer", handleSignalingClientSdpAnswer);
+    signalingClient.on("iceCandidate", handleSignalingChannelIceCandidate);
+    signalingClient.open();
 
-    peerConnection?.addEventListener("icecandidate", handlePeerIceCandidate);
-    peerConnection?.addEventListener("track", handlePeerTrack);
+    peerConnection.addEventListener("icecandidate", handlePeerIceCandidate);
+    peerConnection.addEventListener("track", handlePeerTrack);
 
     return function cleanup() {
       logger.current.logViewer(`[${clientId.current}] cleanup`);
 
-      signalingClient?.off("open", handleOpen);
-      signalingClient?.off("sdpAnswer", handleSdpAnswer);
-      signalingClient?.off("iceCandidate", handleSignalingChannelIceCandidate);
+      signalingClient.off("open", handleSignalingClientOpen);
+      signalingClient.off("sdpAnswer", handleSignalingClientSdpAnswer);
+      signalingClient.off("iceCandidate", handleSignalingChannelIceCandidate);
+      signalingClient.close();
 
-      peerConnection?.removeEventListener(
+      peerConnection.removeEventListener(
         "icecandidate",
         handlePeerIceCandidate
       );
-      peerConnection?.removeEventListener("track", handlePeerTrack);
-      peerConnection?.close();
+      peerConnection.removeEventListener("track", handlePeerTrack);
+      peerConnection.close();
     };
-  }, [clientId, logger, peerConnection, signalingClient, viewerOnly]);
+  }, [
+    clientId,
+    localMediaIsActive,
+    logger,
+    peerConnection,
+    signalingClient,
+    viewerOnly,
+  ]);
 
   /** Handle peer media lifecycle. */
   useEffect(() => {
@@ -236,6 +263,7 @@ export function useViewer(
     channelARN,
     credentials,
     debug,
+    localMediaIsActive: Boolean(localMedia),
     region,
     viewerOnly: !Boolean(media),
   });

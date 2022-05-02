@@ -28,13 +28,6 @@ test("returns the signaling client instance", () => {
   expect(result.current.signalingClient).toBeDefined();
 });
 
-test("opens the signaling client", () => {
-  const { result } = renderHook(() =>
-    useSignalingClient(mockSignalingClientConfig)
-  );
-  expect(result.current.signalingClient?.open).toHaveBeenCalledTimes(1);
-});
-
 test("signaling client is not initialized when channelEndpoint is undefined", () => {
   const { result } = renderHook(() =>
     useSignalingClient({
@@ -45,7 +38,7 @@ test("signaling client is not initialized when channelEndpoint is undefined", ()
   expect(result.current.signalingClient).toBeUndefined();
 });
 
-test("initializes and opens the signaling client once channelEndpoint is defined", () => {
+test("initializes the signaling client when channelEndpoint is defined", () => {
   let channelEndpoint = "";
   const { result, rerender } = renderHook(() =>
     useSignalingClient({
@@ -56,15 +49,6 @@ test("initializes and opens the signaling client once channelEndpoint is defined
   channelEndpoint = "wss://test";
   rerender();
   expect(result.current.signalingClient).toBeDefined();
-  expect(result.current.signalingClient?.open).toHaveBeenCalledTimes(1);
-});
-
-test("closes the signaling client on cleanup", async () => {
-  const { result } = renderHook(() =>
-    useSignalingClient(mockSignalingClientConfig)
-  );
-  await cleanup();
-  expect(result.current.signalingClient?.close).toHaveBeenCalledTimes(1);
 });
 
 test("returns a signaling client error", () => {
