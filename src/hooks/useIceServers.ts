@@ -4,19 +4,21 @@ import {
   KinesisVideoSignalingClient,
   IceServer,
 } from "@aws-sdk/client-kinesis-video-signaling";
-import { AWSCredentials } from "../AWSCredentials";
+import { ConfigOptions } from "../ConfigOptions";
 import { ERROR_ICE_SERVERS_RESPONSE } from "../constants";
 import { withErrorLog } from "../withErrorLog";
 
 /**
  * @description Fetches ice servers for a signaling channel.
  **/
-export function useIceServers(config: {
-  channelARN: string;
-  channelEndpoint?: string;
-  credentials: AWSCredentials;
-  region: string;
-}): { error: Error | undefined; iceServers: RTCIceServer[] | undefined } {
+export function useIceServers(
+  config: ConfigOptions & {
+    channelEndpoint: string | undefined;
+  }
+): {
+  error: Error | undefined;
+  iceServers: RTCIceServer[] | undefined;
+} {
   const {
     channelARN,
     channelEndpoint,
