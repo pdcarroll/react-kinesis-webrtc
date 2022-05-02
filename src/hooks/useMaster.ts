@@ -90,7 +90,7 @@ function useMasterPeerConnections(
     }
 
     function cleanup() {
-      logger.current.logMaster("removing sdp offer listener");
+      logger.current.logMaster("cleaning up peer connections");
 
       signalingClient?.off("sdpOffer", handleSdpOffer);
 
@@ -186,7 +186,6 @@ function useMasterPeerConnections(
       );
     }
 
-    logger.current.logMaster("adding sdp offer listener");
     signalingClient.on("sdpOffer", handleSdpOffer);
 
     return cleanup;
@@ -237,9 +236,9 @@ export function useMaster(config: PeerConfigOptions): {
   useEffect(() => {
     for (const peer of Object.values(peers)) {
       if (peer.isWaitingForMedia) {
-    if (!localMedia) {
+        if (!localMedia) {
           continue;
-    }
+        }
         localMedia.getTracks().forEach((track: MediaStreamTrack) => {
           peer.connection?.addTrack(track, localMedia);
         });
