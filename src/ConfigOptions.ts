@@ -1,5 +1,9 @@
 import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
-import type { AWSCredentials } from "./AWSCredentials";
+
+type AWSCredentials = {
+  accessKeyId: string;
+  secretAccessKey: string;
+};
 
 type MediaConfig = {
   audio?: boolean;
