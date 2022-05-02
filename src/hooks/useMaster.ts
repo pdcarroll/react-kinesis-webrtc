@@ -235,13 +235,12 @@ export function useMaster(config: PeerConfigOptions): {
 
   /* Handle peer side effects */
   useEffect(() => {
-    if (!localMedia) {
-      return;
-    }
-
     for (const peer of Object.values(peers)) {
       if (peer.isWaitingForMedia) {
-        localMedia?.getTracks().forEach((track: MediaStreamTrack) => {
+    if (!localMedia) {
+          continue;
+    }
+        localMedia.getTracks().forEach((track: MediaStreamTrack) => {
           peer.connection?.addTrack(track, localMedia);
         });
         dispatch({

@@ -228,6 +228,9 @@ test("sends media to peer when it is ready", async () => {
   );
   await waitForNextUpdate();
   mockNewPeerConnection(result.current._signalingClient as SignalingClient);
+  expect(result.current.peers[0].connection?.addTrack).toHaveBeenCalledTimes(0);
+  expect(result.current.peers[0].isWaitingForMedia).toEqual(true);
   await waitForNextUpdate();
   expect(result.current.peers[0].connection?.addTrack).toHaveBeenCalledTimes(1);
+  expect(result.current.peers[0].isWaitingForMedia).toEqual(false);
 });
