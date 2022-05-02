@@ -3,7 +3,7 @@ import { Peer } from "../Peer";
 
 type State = Record<string, Peer>;
 type Action = {
-  type: "add" | "update" | "remove" | "removeAll";
+  type: "add" | "update" | "remove";
   payload: Peer;
 };
 
