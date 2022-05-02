@@ -3,6 +3,16 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2022-05-02
+
+### Changed
+
+- Fixes a bug that impacts sending a master local media stream to multiple remote peers simultaneously
+- Delays initialization of peer connections until the local media stream is active (for two-way connections).
+  This fixes bugs caused by a race between the local media stream and remote peer connection events, most
+  visible when a user doesn't immediately grant access to the device's media
+- Some cleanup in debug logging and variable names
+
 ## [0.1.0] - 2022-04-30
 
 ### Added
