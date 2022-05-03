@@ -6,37 +6,35 @@ import { useLocalMedia } from "./useLocalMedia";
 import { usePeerReducer } from "./usePeerReducer";
 import { useSignalingChannelEndpoints } from "./useSignalingChannelEndpoints";
 import { useSignalingClient } from "./useSignalingClient";
-import { ConfigOptions, PeerConfigOptions } from "../ConfigOptions";
+import { PeerConfigOptions } from "../ConfigOptions";
 import { getLogger } from "../logger";
 import { Peer } from "../Peer";
 
 /**
- * @description Handles peer connections to a master signaling client.
+ * @description Opens a master connection using an existing signaling channel.
  **/
-function useMasterPeerConnections(
-  config: ConfigOptions & {
-    localMediaIsActive: boolean;
-    addPeer: (id: string, peer: Peer) => void;
-    removePeer: (id: string) => void;
-    updatePeer: (id: string, update: Partial<Peer>) => void;
-  }
-): {
+export function useMaster(config: PeerConfigOptions): {
   _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
+  localMedia: MediaStream | undefined;
+  peers: Array<Peer>;
 } {
   const {
     channelARN,
     credentials,
     debug = false,
-    localMediaIsActive,
-    addPeer,
-    removePeer,
-    updatePeer,
     region,
+    media = { audio: true, video: true },
   } = config;
+
   const logger = useRef(getLogger({ debug }));
   const role = Role.MASTER;
+  const { error: mediaError, media: localMedia } = useLocalMedia(media);
+  const [peers, dispatch] = usePeerReducer({});
   const [sendIceCandidateError, setSendIceCandidateError] = useState<Error>();
+  const [isOpen, setIsOpen] = useState(false);
+  const localMediaIsActive = Boolean(localMedia);
+
   const kinesisVideoClient = useRef<KinesisVideo>(
     new KinesisVideo({
       region,
@@ -51,6 +49,13 @@ function useMasterPeerConnections(
       role,
     });
 
+  const { error: iceServersError, iceServers } = useIceServers({
+    channelARN,
+    channelEndpoint: signalingChannelEndpoints?.HTTPS,
+    credentials,
+    region,
+  });
+
   const { error: signalingClientError, signalingClient } = useSignalingClient({
     channelARN,
     channelEndpoint: signalingChannelEndpoints?.WSS,
@@ -60,15 +65,33 @@ function useMasterPeerConnections(
     systemClockOffset: kinesisVideoClient.current.config.systemClockOffset,
   });
 
-  const { error: iceServersError, iceServers } = useIceServers({
-    channelARN,
-    channelEndpoint: signalingChannelEndpoints?.HTTPS,
-    credentials,
-    region,
-  });
-
   // this dict. is used to perform cleanup tasks
   const peerCleanup = useRef<Record<Peer["id"], () => void>>({});
+
+  const addPeer = useCallback(
+    (id, peer) => {
+      dispatch({
+        type: "add",
+        payload: { ...peer, isWaitingForMedia: true },
+      });
+    },
+    [dispatch]
+  );
+
+  const removePeer = useCallback(
+    (id) => {
+      dispatch({ type: "remove", payload: { id } });
+    },
+    [dispatch]
+  );
+
+  const updatePeer = useCallback(
+    (id, update) => dispatch({ type: "update", payload: { id, ...update } }),
+    [dispatch]
+  );
+
+  const externalError =
+    signalingClientError || iceServersError || sendIceCandidateError;
 
   /**
    * Handle signaling client events.
@@ -80,9 +103,6 @@ function useMasterPeerConnections(
       return;
     }
 
-    const externalError =
-      signalingClientError || iceServersError || sendIceCandidateError;
-
     if (externalError) {
       logger.current.logMaster(
         `cleaning up signaling client after error: ${externalError.message}`
@@ -93,8 +113,10 @@ function useMasterPeerConnections(
     function cleanup() {
       logger.current.logMaster("cleaning up peer connections");
 
-      signalingClient?.off("sdpOffer", handleSdpOffer);
       signalingClient?.close();
+      signalingClient?.off("sdpOffer", handleSignalingClientSdpOffer);
+
+      setIsOpen(false);
 
       for (const [id, fn] of Object.entries(peerCleanup.current)) {
         fn();
@@ -104,7 +126,10 @@ function useMasterPeerConnections(
     }
 
     /* sdp offer = new peer connection */
-    async function handleSdpOffer(offer: RTCSessionDescription, id: string) {
+    async function handleSignalingClientSdpOffer(
+      offer: RTCSessionDescription,
+      id: string
+    ) {
       logger.current.logMaster("received sdp offer");
 
       const connection = new RTCPeerConnection({
@@ -189,52 +214,21 @@ function useMasterPeerConnections(
     }
 
     signalingClient.on("sdpOffer", handleSdpOffer);
+    signalingClient.on("sdpOffer", handleSignalingClientSdpOffer);
     signalingClient.open();
 
     return cleanup;
   }, [
     addPeer,
+    externalError,
     iceServers,
-    iceServersError,
     localMediaIsActive,
     logger,
     peerCleanup,
     removePeer,
-    sendIceCandidateError,
     signalingClient,
-    signalingClientError,
     updatePeer,
   ]);
-
-  return {
-    _signalingClient: signalingClient,
-    error:
-      signalingChannelEndpointsError ||
-      signalingClientError ||
-      iceServersError ||
-      sendIceCandidateError,
-  };
-}
-
-/**
- * @description Opens a master connection using an existing signaling channel.
- **/
-export function useMaster(config: PeerConfigOptions): {
-  _signalingClient: SignalingClient | undefined;
-  error: Error | undefined;
-  localMedia: MediaStream | undefined;
-  peers: Array<Peer>;
-} {
-  const {
-    channelARN,
-    credentials,
-    debug = false,
-    region,
-    media = { audio: true, video: true },
-  } = config;
-  const logger = getLogger({ debug });
-  const { error: mediaError, media: localMedia } = useLocalMedia(media);
-  const [peers, dispatch] = usePeerReducer({});
 
   /* Handle peer side effects */
   useEffect(() => {
@@ -254,38 +248,11 @@ export function useMaster(config: PeerConfigOptions): {
     }
   }, [dispatch, localMedia, peers]);
 
-  logger.logMaster({ peers });
-
-  const { _signalingClient, error: peerConnectionsError } =
-    useMasterPeerConnections({
-      channelARN,
-      credentials,
-      debug,
-      region,
-      localMediaIsActive: Boolean(localMedia),
-      addPeer: useCallback(
-        (id, peer) => {
-          dispatch({
-            type: "add",
-            payload: { ...peer, isWaitingForMedia: true },
-          });
-        },
-        [dispatch]
-      ),
-      removePeer: useCallback(
-        (id) => {
-          dispatch({ type: "remove", payload: { id } });
-        },
-        [dispatch]
-      ),
-      updatePeer: useCallback(
-        (id, update) =>
-          dispatch({ type: "update", payload: { id, ...update } }),
-        [dispatch]
-      ),
-    });
+  logger.current.logMaster({ peers });
 
   return {
+    _signalingClient: signalingClient,
+    error: mediaError || signalingChannelEndpointsError,
     _signalingClient,
     error: mediaError || peerConnectionsError,
     localMedia,
