@@ -12,31 +12,28 @@ import {
   ERROR_PEER_CONNECTION_NOT_INITIALIZED,
   ERROR_SIGNALING_CLIENT_NOT_CONNECTED,
 } from "../constants";
-import { ConfigOptions, PeerConfigOptions } from "../ConfigOptions";
+import { PeerConfigOptions } from "../ConfigOptions";
 import { Peer } from "../Peer";
 import { getLogger } from "../logger";
 
 /**
- * @description Handles peer connection to a viewer signaling client.
+ * @description Opens a viewer connection to an active master signaling channel.
  **/
-function useViewerPeerConnection(
-  config: ConfigOptions & {
-    localMediaIsActive: boolean;
-    viewerOnly?: boolean;
+export function useViewer(
+  config: Omit<PeerConfigOptions, "media"> & {
+    media?: PeerConfigOptions["media"];
   }
 ): {
   _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
-  peer: Peer;
+  localMedia: MediaStream | undefined;
+  peer: Peer | undefined;
 } {
-  const {
-    channelARN,
-    credentials,
-    debug = false,
-    localMediaIsActive,
-    region,
-    viewerOnly,
-  } = config;
+  const { channelARN, credentials, debug, region, media } = config;
+  const { error: streamError, media: localMedia } = useLocalMedia(
+    media || { audio: false, video: false }
+  );
+
   const logger = useRef(getLogger({ debug }));
   const role = Role.VIEWER;
   const clientId = useRef<string>(uuid());
@@ -52,6 +49,8 @@ function useViewerPeerConnection(
   const [peerConnection, setPeerConnection] = useState<RTCPeerConnection>();
   const [peerMedia, setPeerMedia] = useState<MediaStream>();
   const [peerError, setPeerError] = useState<Error>();
+  const viewerOnly = !Boolean(media);
+  const localMediaIsActive = Boolean(localMedia);
 
   const { error: signalingChannelEndpointsError, signalingChannelEndpoints } =
     useSignalingChannelEndpoints({
@@ -76,6 +75,15 @@ function useViewerPeerConnection(
     role,
     systemClockOffset: kinesisVideoClient.config.systemClockOffset,
   });
+
+  const depsError =
+    signalingChannelEndpointsError || iceServersError || signalingClientError;
+
+  const peer = {
+    id: clientId.current,
+    connection: peerConnection,
+    media: peerMedia,
+  };
 
   /** Initialize the peer connection with ice servers. */
   useEffect(() => {
@@ -223,51 +231,6 @@ function useViewerPeerConnection(
     };
   }, [peerMedia]);
 
-  return {
-    _signalingClient: signalingClient,
-    error:
-      signalingChannelEndpointsError ||
-      iceServersError ||
-      signalingClientError ||
-      peerError,
-    peer: {
-      id: clientId.current,
-      connection: peerConnection,
-      media: peerMedia,
-    },
-  };
-}
-
-/**
- * @description Opens a viewer connection to an active master signaling channel.
- **/
-export function useViewer(
-  config: Omit<PeerConfigOptions, "media"> & {
-    media?: PeerConfigOptions["media"];
-  }
-): {
-  _signalingClient: SignalingClient | undefined;
-  error: Error | undefined;
-  localMedia: MediaStream | undefined;
-  peer: Peer | undefined;
-} {
-  const { channelARN, credentials, debug, region, media } = config;
-  const { error: streamError, media: localMedia } = useLocalMedia(
-    media || { audio: false, video: false }
-  );
-  const {
-    _signalingClient,
-    error: peerConnectionError,
-    peer,
-  } = useViewerPeerConnection({
-    channelARN,
-    credentials,
-    debug,
-    localMediaIsActive: Boolean(localMedia),
-    region,
-    viewerOnly: !Boolean(media),
-  });
-
   /** Send local media stream to remote peer. */
   useEffect(() => {
     if (!localMedia || !peer.connection) {
@@ -280,8 +243,8 @@ export function useViewer(
   }, [localMedia, peer.connection]);
 
   return {
-    _signalingClient,
-    error: streamError || peerConnectionError,
+    _signalingClient: signalingClient,
+    error: depsError || streamError || peerError,
     localMedia,
     peer,
   };
