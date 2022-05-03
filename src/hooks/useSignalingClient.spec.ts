@@ -1,4 +1,4 @@
-import { act, cleanup, renderHook } from "@testing-library/react-hooks";
+import { act, renderHook } from "@testing-library/react-hooks";
 import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
 import * as mockBaseConfig from "../../__test__/fixtures/config.json";
 import { mockSignalingClient } from "../../__test__/mocks/mockSignalingClient";
@@ -60,16 +60,4 @@ test("returns a signaling client error", () => {
     result.current.signalingClient?.emit("error", signalingClientError);
   });
   expect(result.current.error).toBe(signalingClientError);
-});
-
-// todo: make this test work
-test.skip("cancels on cleanup", async () => {
-  const { result } = renderHook(() =>
-    useSignalingClient(mockSignalingClientConfig)
-  );
-  act(() => {
-    result.current.signalingClient?.emit("error", new Error());
-  });
-  await cleanup();
-  expect(result.current.error).toBeUndefined();
 });
