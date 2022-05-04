@@ -3,6 +3,18 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2022-05-04
+
+### Added
+
+- (useMaster) Return param - `isOpen` - to indicate whether or not the underlying signaling client is open and ready to accept peers
+- License file
+
+### Changed
+
+- Refactor: consolidated hooks in master & viewer
+- Moved documentation from README to Wiki
+
 ## [0.1.1] - 2022-05-02
 
 ### Changed
