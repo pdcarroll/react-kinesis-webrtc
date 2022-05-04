@@ -16,6 +16,7 @@ import { Peer } from "../Peer";
 export function useMaster(config: PeerConfigOptions): {
   _signalingClient: SignalingClient | undefined;
   error: Error | undefined;
+  isOpen: boolean;
   localMedia: MediaStream | undefined;
   peers: Array<Peer>;
 } {
@@ -115,6 +116,7 @@ export function useMaster(config: PeerConfigOptions): {
 
       signalingClient?.close();
       signalingClient?.off("sdpOffer", handleSignalingClientSdpOffer);
+      signalingClient?.off("open", handleSignalingClientOpen);
 
       setIsOpen(false);
 
@@ -213,8 +215,12 @@ export function useMaster(config: PeerConfigOptions): {
       );
     }
 
-    signalingClient.on("sdpOffer", handleSdpOffer);
+    function handleSignalingClientOpen() {
+      setIsOpen(true);
+    }
+
     signalingClient.on("sdpOffer", handleSignalingClientSdpOffer);
+    signalingClient.on("open", handleSignalingClientOpen);
     signalingClient.open();
 
     return cleanup;
@@ -253,8 +259,7 @@ export function useMaster(config: PeerConfigOptions): {
   return {
     _signalingClient: signalingClient,
     error: mediaError || signalingChannelEndpointsError,
-    _signalingClient,
-    error: mediaError || peerConnectionsError,
+    isOpen,
     localMedia,
     peers: Object.values(peers),
   };

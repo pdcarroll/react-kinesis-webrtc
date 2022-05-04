@@ -73,6 +73,12 @@ function mockPeerDisconnect(peerConnection: RTCPeerConnection) {
   });
 }
 
+function mockSignalingClientOpen(signalingClient: SignalingClient) {
+  act(() => {
+    signalingClient?.emit("open");
+  });
+}
+
 function mockSignalingClientError(signalingClient: SignalingClient) {
   act(() => {
     signalingClient.emit("error", new Error());
@@ -87,6 +93,15 @@ test("opens the signaling client", async () => {
   expect(
     (result.current._signalingClient as SignalingClient).open
   ).toHaveBeenCalledTimes(1);
+});
+
+test("toggles isOpen when signaling client opens", async () => {
+  const { result, waitForNextUpdate } = renderHook(() =>
+    useMaster(masterConfig)
+  );
+  await waitForNextUpdate();
+  mockSignalingClientOpen(result.current._signalingClient as SignalingClient);
+  expect(result.current.isOpen).toBe(true);
 });
 
 test("closes the signaling client on cleanup", async () => {
