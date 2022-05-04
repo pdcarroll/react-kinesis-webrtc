@@ -160,6 +160,7 @@ Establishes a master connection using an existing signaling channel. Manages pee
 ```typescript
 {
   error: Error | undefined,             // Error
+  isOpen: boolean,                      // Whether or not the underlying signaling client is open and ready to accept peers
   localMedia: MediaStream | undefined,  // Your local media stream
   peers: Array<Peer>                    // Remote viewer peer media streams
 }
