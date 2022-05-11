@@ -90,7 +90,7 @@ export function useSignalingChannelEndpoints(config: {
           if (isCancelled) {
             return;
           }
-          setError(error);
+          setError(typeof error === "string" ? new Error(error) : error);
         })
       );
 
