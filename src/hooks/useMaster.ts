@@ -30,7 +30,11 @@ export function useMaster(config: PeerConfigOptions): {
 
   const logger = useRef(getLogger({ debug }));
   const role = Role.MASTER;
-  const { error: mediaError, media: localMedia } = useLocalMedia(media);
+  const {
+    error: mediaError,
+    media: localMedia,
+    cancel: cancelLocalMedia,
+  } = useLocalMedia(media);
   const [peers, dispatch] = usePeerReducer({});
   const [sendIceCandidateError, setSendIceCandidateError] = useState<Error>();
   const [isOpen, setIsOpen] = useState(false);
@@ -92,7 +96,19 @@ export function useMaster(config: PeerConfigOptions): {
   );
 
   const externalError =
-    signalingClientError || iceServersError || sendIceCandidateError;
+    signalingChannelEndpointsError ||
+    signalingClientError ||
+    iceServersError ||
+    sendIceCandidateError;
+
+  /* Cancel the local media stream when an error occurs */
+  useEffect(() => {
+    if (!externalError) {
+      return;
+    }
+    logger.current.logMaster("cancelling local media stream");
+    cancelLocalMedia();
+  }, [externalError, cancelLocalMedia]);
 
   /**
    * Handle signaling client events.
@@ -258,7 +274,7 @@ export function useMaster(config: PeerConfigOptions): {
 
   return {
     _signalingClient: signalingClient,
-    error: mediaError || signalingChannelEndpointsError,
+    error: mediaError || externalError,
     isOpen,
     localMedia,
     peers: Object.values(peers),

@@ -85,6 +85,19 @@ function mockSignalingClientError(signalingClient: SignalingClient) {
   });
 }
 
+function mockMediaDevicesWithDelay(delay = 200) {
+  return mockMediaDevices({
+    getUserMedia: jest.fn(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => {
+            resolve(mockUserMediaStream());
+          }, delay)
+        )
+    ),
+  });
+}
+
 test("opens the signaling client", async () => {
   const { result, waitForNextUpdate } = renderHook(() =>
     useMaster(masterConfig)
@@ -228,19 +241,20 @@ test("removes peers when there is a signaling client error", async () => {
 });
 
 test("does not open the signaling client until the local media stream is created", async () => {
-  mockMediaDevices({
-    getUserMedia: jest.fn(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(() => {
-            resolve(mockUserMediaStream());
-          }, 200)
-        )
-    ),
-  });
+  mockMediaDevicesWithDelay();
   const { result, waitForNextUpdate } = renderHook(() =>
     useMaster(masterConfig)
   );
   await waitForNextUpdate();
   expect(result.current._signalingClient?.open).toHaveBeenCalledTimes(0);
+});
+
+test("cancels the local media stream when there is an error", async () => {
+  mockMediaDevicesWithDelay();
+  const { result, waitForNextUpdate } = renderHook(() =>
+    useMaster(masterConfig)
+  );
+  await waitForNextUpdate();
+  mockSignalingClientError(result.current._signalingClient as SignalingClient);
+  expect(result.current.localMedia).toBeUndefined();
 });

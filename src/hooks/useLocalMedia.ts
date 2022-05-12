@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { withErrorLog } from "../withErrorLog";
 
 /**
@@ -10,30 +10,41 @@ export function useLocalMedia({
 }: {
   audio?: boolean;
   video?: boolean | MediaTrackConstraints;
-}): { error: Error | undefined; media: MediaStream | undefined } {
+}): {
+  error: Error | undefined;
+  media: MediaStream | undefined;
+  cancel: () => void;
+} {
   const [media, setMedia] = useState<MediaStream>();
   const [error, setError] = useState<Error>();
+  const isCancelled = useRef(false);
 
   useEffect(() => {
+    if (isCancelled.current) {
+      return;
+    }
+
     if (!video && !audio) {
       return;
     }
 
     let _media: MediaStream;
-    let isCancelled = false;
 
     navigator.mediaDevices
       .getUserMedia({ video, audio })
       .then((mediaStream) => {
-        if (isCancelled) {
+        _media = mediaStream;
+        if (isCancelled.current) {
+          _media.getTracks().forEach((track) => {
+            track.stop();
+          });
           return;
         }
-        _media = mediaStream;
         setMedia(mediaStream);
       })
       .catch(
         withErrorLog((error) => {
-          if (isCancelled) {
+          if (isCancelled.current) {
             return;
           }
           setError(error);
@@ -41,13 +52,21 @@ export function useLocalMedia({
       );
 
     return function cleanup() {
-      isCancelled = true;
+      isCancelled.current = true;
 
       _media?.getTracks().forEach((track: MediaStreamTrack) => {
         track.stop();
       });
     };
-  }, [video, audio]);
+  }, [video, audio, isCancelled]);
 
-  return { error, media };
+  const cancel = () => {
+    isCancelled.current = true;
+  };
+
+  return {
+    error,
+    media,
+    cancel,
+  };
 }

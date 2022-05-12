@@ -64,3 +64,12 @@ test("does not access local media when media config options are not set", () => 
   renderHook(() => useLocalMedia({ audio: false, video: false }));
   expect(getUserMedia).toHaveBeenCalledTimes(0);
 });
+
+test("is cancellable", async () => {
+  const { result, rerender } = renderHook(() =>
+    useLocalMedia({ audio: true, video: true })
+  );
+  result.current.cancel();
+  rerender();
+  expect(result.current.media).toBeUndefined();
+});
