@@ -3,6 +3,7 @@ import * as KVSWebRTC from "amazon-kinesis-video-streams-webrtc";
 type AWSCredentials = {
   accessKeyId: string;
   secretAccessKey: string;
+  sessionToken?: string;
 };
 
 type MediaConfig = {

@@ -22,7 +22,7 @@ export function useIceServers(
   const {
     channelARN,
     channelEndpoint,
-    credentials: { accessKeyId = "", secretAccessKey = "" } = {},
+    credentials: { accessKeyId = "", secretAccessKey = "", sessionToken = undefined} = {},
     region,
   } = config;
   const [error, setError] = useState<Error>();
@@ -41,6 +41,7 @@ export function useIceServers(
         credentials: {
           accessKeyId,
           secretAccessKey,
+          sessionToken,
         },
         endpoint: channelEndpoint,
       }

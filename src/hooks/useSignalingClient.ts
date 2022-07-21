@@ -12,7 +12,7 @@ export function useSignalingClient(config: SignalingClientConfigOptions): {
   const {
     channelARN,
     channelEndpoint,
-    credentials: { accessKeyId = "", secretAccessKey = "" } = {},
+    credentials: { accessKeyId = "", secretAccessKey = "", sessionToken = undefined } = {},
     clientId,
     region,
     role,
@@ -37,7 +37,7 @@ export function useSignalingClient(config: SignalingClientConfigOptions): {
         channelARN,
         channelEndpoint,
         clientId,
-        credentials: { accessKeyId, secretAccessKey },
+        credentials: { accessKeyId, secretAccessKey, sessionToken },
         region,
         role,
         systemClockOffset,
@@ -51,6 +51,7 @@ export function useSignalingClient(config: SignalingClientConfigOptions): {
     region,
     role,
     secretAccessKey,
+    sessionToken,
     systemClockOffset,
   ]);
 
