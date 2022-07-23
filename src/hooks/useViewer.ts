@@ -214,6 +214,7 @@ export function useViewer(
       );
       peerConnection.removeEventListener("track", handlePeerTrack);
       peerConnection.close();
+      setPeerConnection(undefined);
     };
   }, [
     clientId,
