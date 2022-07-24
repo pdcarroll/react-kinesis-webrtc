@@ -32,34 +32,17 @@ export function useSignalingClient(config: SignalingClientConfigOptions): {
       return;
     }
 
-    if (signalingClient) {
-      signalingClient.on("close", () => {
-        setSignalingClient(
-          new SignalingClient({
-            channelARN,
-            channelEndpoint,
-            clientId,
-            credentials: { accessKeyId, secretAccessKey, sessionToken },
-            region,
-            role,
-            systemClockOffset,
-          })
-        );
-      });
-      setSignalingClient(undefined);
-    } else {
-      setSignalingClient(
-        new SignalingClient({
-          channelARN,
-          channelEndpoint,
-          clientId,
-          credentials: { accessKeyId, secretAccessKey, sessionToken },
-          region,
-          role,
-          systemClockOffset,
-        })
-      );
-    }
+    setSignalingClient(
+      new SignalingClient({
+        channelARN,
+        channelEndpoint,
+        clientId,
+        credentials: { accessKeyId, secretAccessKey, sessionToken },
+        region,
+        role,
+        systemClockOffset,
+      })
+    );
   }, [
     accessKeyId,
     channelARN,
