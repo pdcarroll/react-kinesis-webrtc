@@ -22,6 +22,8 @@ import { getLogger } from "../logger";
 export function useViewer(
   config: Omit<PeerConfigOptions, "media"> & {
     media?: PeerConfigOptions["media"];
+  } & {
+    handleConnectionChange?: (ev: Event) => any;
   }
 ): {
   _signalingClient: SignalingClient | undefined;
@@ -199,6 +201,9 @@ export function useViewer(
 
     peerConnection.addEventListener("icecandidate", handlePeerIceCandidate);
     peerConnection.addEventListener("track", handlePeerTrack);
+    if (config.handleConnectionChange) {
+      peerConnection.addEventListener("connectionstatechange", config.handleConnectionChange)
+    }
 
     return function cleanup() {
       logger.current.logViewer(`[${clientId.current}] cleanup`);
